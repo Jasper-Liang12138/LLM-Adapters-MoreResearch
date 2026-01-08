@@ -1,0 +1,11 @@
+[
+  {
+    "dataset": "AQuA",
+    "total": 254,
+    "average_intrinsic_dimension": 78.89763779527559,
+    "std_intrinsic_dimension": 10.800141910462592,
+    "median_intrinsic_dimension": 78.5,
+    "min_intrinsic_dimension": 50,
+    "max_intrinsic_dimension": 118
+  }
+]

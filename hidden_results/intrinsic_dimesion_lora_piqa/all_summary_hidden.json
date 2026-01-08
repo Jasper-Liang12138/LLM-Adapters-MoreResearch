@@ -1,0 +1,11 @@
+[
+  {
+    "dataset": "piqa",
+    "total": 1838,
+    "average_intrinsic_dimension": 87.99945593035909,
+    "std_intrinsic_dimension": 28.709465435287026,
+    "median_intrinsic_dimension": 79.0,
+    "min_intrinsic_dimension": 57,
+    "max_intrinsic_dimension": 322
+  }
+]

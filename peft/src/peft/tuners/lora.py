@@ -512,7 +512,7 @@ if is_bnb_available():
             )
             LoraLayer.__init__(self, r=r, lora_alpha=lora_alpha, lora_dropout=lora_dropout, merge_weights=False)
             # Actual trainable parameters
-            if r > 0:
+            if int(r) > 0:
                 self.lora_A = nn.Linear(in_features, r, bias=False)
                 self.lora_B = nn.Linear(r, out_features, bias=False)
                 self.scaling = self.lora_alpha / self.r

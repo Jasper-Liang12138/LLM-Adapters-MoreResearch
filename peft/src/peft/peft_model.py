@@ -28,7 +28,7 @@ from transformers import PreTrainedModel
 from transformers.modeling_outputs import SequenceClassifierOutput, TokenClassifierOutput
 from transformers.utils import PushToHubMixin
 
-from .tuners import LoraModel, BottleneckModel, PrefixEncoder, PromptEmbedding, PromptEncoder
+from .tuners import LoraModel, BottleneckModel, AdaLoraModel, QLoRAModel, PrefixEncoder, PromptEmbedding, PromptEncoder
 from .utils import (
     TRANSFORMERS_MODELS_TO_PREFIX_TUNING_POSTPROCESS_MAPPING,
     WEIGHTS_NAME,
@@ -68,11 +68,13 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
     """
 
     def __init__(self, model, peft_config: PeftConfig):
-        super().__init__()
-        self.peft_config = peft_config
-        self.base_model = model
-        self.config = self.base_model.config
-        self.modules_to_save = None
+        super().__init__() #初始化父类torch.nn.Module
+        self.peft_config = peft_config #peft_config配置
+        self.base_model = model #预训练基础模型
+        self.config = self.base_model.config #基础模型配置
+        self.modules_to_save = None #需要额外保存的子模块列表
+
+        # 根据配置初始化对应的PEFT方法
         if isinstance(self.peft_config, PromptLearningConfig):
             self._setup_prompt_encoder()
         else:
@@ -80,9 +82,15 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
                 self.base_model = LoraModel(peft_config, model)
             elif self.peft_config.peft_type == PeftType.BOTTLENECK:
                 self.base_model = BottleneckModel(peft_config, model)
+            elif self.peft_config.peft_type == PeftType.ADALORA:
+                self.base_model = AdaLoraModel(peft_config, model)
+            elif self.peft_config.peft_type == PeftType.QLORA:
+                self.base_model = QLoRAModel(peft_config, model)
+        # getattr(object, attribute_name, default) ，获取 object 的属性 attribute_name，如果不存在，则返回 default。       
         if getattr(self.peft_config, "modules_to_save", None) is not None:
             self.modules_to_save = self.peft_config.modules_to_save
             _set_trainable(self)
+
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.base_model_torch_dtype = getattr(model, "dtype", None)
 
@@ -183,12 +191,19 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
             if model.peft_config.peft_type == PeftType.LORA or model.peft_config.peft_type == PeftType.BOTTLENECK:
                 add_hook_to_module(model.base_model.model, hook)
             else:
-                remove_hook_from_submodules(model.prompt_encoder)
+                # Only remove hooks from prompt_encoder if it exists (prompt-learning only).
+                if hasattr(model, "prompt_encoder"):
+                    try:
+                        remove_hook_from_submodules(model.prompt_encoder)
+                    except Exception:
+                        # non-fatal: continue even if removing hooks fails
+                        pass
                 add_hook_to_module(model.base_model, hook)
         return model
 
     def _setup_prompt_encoder(self):
         transformer_backbone = None
+        # 冻结基础模型参数
         for name, module in self.base_model.named_children():
             for param in module.parameters():
                 param.requires_grad = False
@@ -221,6 +236,7 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
             self.peft_config.num_virtual_tokens * self.peft_config.num_transformer_submodules
         ).long()
 
+    # 保存prompt_embedding
     def get_prompt_embedding_to_save(self):
         """
         Returns the prompt embedding to save when saving the model. Only applicable when `peft_config.peft_type !=
@@ -232,6 +248,7 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
         prompt_embeddings = self.prompt_encoder(prompt_tokens)
         return prompt_embeddings[0].detach().cpu()
 
+    # 获取虚拟提示
     def get_prompt(self, batch_size):
         """
         Returns the virtual prompts to use for Peft. Only applicable when `peft_config.peft_type != PeftType.LORA`.

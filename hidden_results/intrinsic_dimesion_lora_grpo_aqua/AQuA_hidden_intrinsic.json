@@ -1,0 +1,1029 @@
+{
+  "summary": {
+    "dataset": "AQuA",
+    "total": 254,
+    "average_intrinsic_dimension": 79.90944881889764,
+    "std_intrinsic_dimension": 10.845173338198403,
+    "median_intrinsic_dimension": 79.0,
+    "min_intrinsic_dimension": 51,
+    "max_intrinsic_dimension": 120
+  },
+  "results": [
+    {
+      "index": 0,
+      "intrinsic_dimension": 87
+    },
+    {
+      "index": 1,
+      "intrinsic_dimension": 72
+    },
+    {
+      "index": 2,
+      "intrinsic_dimension": 85
+    },
+    {
+      "index": 3,
+      "intrinsic_dimension": 80
+    },
+    {
+      "index": 4,
+      "intrinsic_dimension": 68
+    },
+    {
+      "index": 5,
+      "intrinsic_dimension": 88
+    },
+    {
+      "index": 6,
+      "intrinsic_dimension": 84
+    },
+    {
+      "index": 7,
+      "intrinsic_dimension": 82
+    },
+    {
+      "index": 8,
+      "intrinsic_dimension": 73
+    },
+    {
+      "index": 9,
+      "intrinsic_dimension": 75
+    },
+    {
+      "index": 10,
+      "intrinsic_dimension": 78
+    },
+    {
+      "index": 11,
+      "intrinsic_dimension": 69
+    },
+    {
+      "index": 12,
+      "intrinsic_dimension": 97
+    },
+    {
+      "index": 13,
+      "intrinsic_dimension": 59
+    },
+    {
+      "index": 14,
+      "intrinsic_dimension": 78
+    },
+    {
+      "index": 15,
+      "intrinsic_dimension": 83
+    },
+    {
+      "index": 16,
+      "intrinsic_dimension": 69
+    },
+    {
+      "index": 17,
+      "intrinsic_dimension": 82
+    },
+    {
+      "index": 18,
+      "intrinsic_dimension": 82
+    },
+    {
+      "index": 19,
+      "intrinsic_dimension": 54
+    },
+    {
+      "index": 20,
+      "intrinsic_dimension": 76
+    },
+    {
+      "index": 21,
+      "intrinsic_dimension": 88
+    },
+    {
+      "index": 22,
+      "intrinsic_dimension": 92
+    },
+    {
+      "index": 23,
+      "intrinsic_dimension": 91
+    },
+    {
+      "index": 24,
+      "intrinsic_dimension": 109
+    },
+    {
+      "index": 25,
+      "intrinsic_dimension": 77
+    },
+    {
+      "index": 26,
+      "intrinsic_dimension": 74
+    },
+    {
+      "index": 27,
+      "intrinsic_dimension": 81
+    },
+    {
+      "index": 28,
+      "intrinsic_dimension": 88
+    },
+    {
+      "index": 29,
+      "intrinsic_dimension": 77
+    },
+    {
+      "index": 30,
+      "intrinsic_dimension": 73
+    },
+    {
+      "index": 31,
+      "intrinsic_dimension": 85
+    },
+    {
+      "index": 32,
+      "intrinsic_dimension": 83
+    },
+    {
+      "index": 33,
+      "intrinsic_dimension": 80
+    },
+    {
+      "index": 34,
+      "intrinsic_dimension": 77
+    },
+    {
+      "index": 35,
+      "intrinsic_dimension": 88
+    },
+    {
+      "index": 36,
+      "intrinsic_dimension": 79
+    },
+    {
+      "index": 37,
+      "intrinsic_dimension": 80
+    },
+    {
+      "index": 38,
+      "intrinsic_dimension": 62
+    },
+    {
+      "index": 39,
+      "intrinsic_dimension": 84
+    },
+    {
+      "index": 40,
+      "intrinsic_dimension": 78
+    },
+    {
+      "index": 41,
+      "intrinsic_dimension": 80
+    },
+    {
+      "index": 42,
+      "intrinsic_dimension": 75
+    },
+    {
+      "index": 43,
+      "intrinsic_dimension": 98
+    },
+    {
+      "index": 44,
+      "intrinsic_dimension": 78
+    },
+    {
+      "index": 45,
+      "intrinsic_dimension": 81
+    },
+    {
+      "index": 46,
+      "intrinsic_dimension": 87
+    },
+    {
+      "index": 47,
+      "intrinsic_dimension": 74
+    },
+    {
+      "index": 48,
+      "intrinsic_dimension": 69
+    },
+    {
+      "index": 49,
+      "intrinsic_dimension": 82
+    },
+    {
+      "index": 50,
+      "intrinsic_dimension": 60
+    },
+    {
+      "index": 51,
+      "intrinsic_dimension": 75
+    },
+    {
+      "index": 52,
+      "intrinsic_dimension": 81
+    },
+    {
+      "index": 53,
+      "intrinsic_dimension": 70
+    },
+    {
+      "index": 54,
+      "intrinsic_dimension": 95
+    },
+    {
+      "index": 55,
+      "intrinsic_dimension": 61
+    },
+    {
+      "index": 56,
+      "intrinsic_dimension": 52
+    },
+    {
+      "index": 57,
+      "intrinsic_dimension": 86
+    },
+    {
+      "index": 58,
+      "intrinsic_dimension": 72
+    },
+    {
+      "index": 59,
+      "intrinsic_dimension": 86
+    },
+    {
+      "index": 60,
+      "intrinsic_dimension": 81
+    },
+    {
+      "index": 61,
+      "intrinsic_dimension": 76
+    },
+    {
+      "index": 62,
+      "intrinsic_dimension": 80
+    },
+    {
+      "index": 63,
+      "intrinsic_dimension": 95
+    },
+    {
+      "index": 64,
+      "intrinsic_dimension": 79
+    },
+    {
+      "index": 65,
+      "intrinsic_dimension": 75
+    },
+    {
+      "index": 66,
+      "intrinsic_dimension": 76
+    },
+    {
+      "index": 67,
+      "intrinsic_dimension": 87
+    },
+    {
+      "index": 68,
+      "intrinsic_dimension": 76
+    },
+    {
+      "index": 69,
+      "intrinsic_dimension": 91
+    },
+    {
+      "index": 70,
+      "intrinsic_dimension": 99
+    },
+    {
+      "index": 71,
+      "intrinsic_dimension": 63
+    },
+    {
+      "index": 72,
+      "intrinsic_dimension": 81
+    },
+    {
+      "index": 73,
+      "intrinsic_dimension": 71
+    },
+    {
+      "index": 74,
+      "intrinsic_dimension": 85
+    },
+    {
+      "index": 75,
+      "intrinsic_dimension": 81
+    },
+    {
+      "index": 76,
+      "intrinsic_dimension": 97
+    },
+    {
+      "index": 77,
+      "intrinsic_dimension": 73
+    },
+    {
+      "index": 78,
+      "intrinsic_dimension": 86
+    },
+    {
+      "index": 79,
+      "intrinsic_dimension": 103
+    },
+    {
+      "index": 80,
+      "intrinsic_dimension": 75
+    },
+    {
+      "index": 81,
+      "intrinsic_dimension": 82
+    },
+    {
+      "index": 82,
+      "intrinsic_dimension": 80
+    },
+    {
+      "index": 83,
+      "intrinsic_dimension": 54
+    },
+    {
+      "index": 84,
+      "intrinsic_dimension": 94
+    },
+    {
+      "index": 85,
+      "intrinsic_dimension": 88
+    },
+    {
+      "index": 86,
+      "intrinsic_dimension": 101
+    },
+    {
+      "index": 87,
+      "intrinsic_dimension": 82
+    },
+    {
+      "index": 88,
+      "intrinsic_dimension": 73
+    },
+    {
+      "index": 89,
+      "intrinsic_dimension": 71
+    },
+    {
+      "index": 90,
+      "intrinsic_dimension": 74
+    },
+    {
+      "index": 91,
+      "intrinsic_dimension": 84
+    },
+    {
+      "index": 92,
+      "intrinsic_dimension": 72
+    },
+    {
+      "index": 93,
+      "intrinsic_dimension": 94
+    },
+    {
+      "index": 94,
+      "intrinsic_dimension": 77
+    },
+    {
+      "index": 95,
+      "intrinsic_dimension": 70
+    },
+    {
+      "index": 96,
+      "intrinsic_dimension": 76
+    },
+    {
+      "index": 97,
+      "intrinsic_dimension": 84
+    },
+    {
+      "index": 98,
+      "intrinsic_dimension": 62
+    },
+    {
+      "index": 99,
+      "intrinsic_dimension": 81
+    },
+    {
+      "index": 100,
+      "intrinsic_dimension": 89
+    },
+    {
+      "index": 101,
+      "intrinsic_dimension": 86
+    },
+    {
+      "index": 102,
+      "intrinsic_dimension": 73
+    },
+    {
+      "index": 103,
+      "intrinsic_dimension": 76
+    },
+    {
+      "index": 104,
+      "intrinsic_dimension": 74
+    },
+    {
+      "index": 105,
+      "intrinsic_dimension": 70
+    },
+    {
+      "index": 106,
+      "intrinsic_dimension": 76
+    },
+    {
+      "index": 107,
+      "intrinsic_dimension": 89
+    },
+    {
+      "index": 108,
+      "intrinsic_dimension": 94
+    },
+    {
+      "index": 109,
+      "intrinsic_dimension": 80
+    },
+    {
+      "index": 110,
+      "intrinsic_dimension": 78
+    },
+    {
+      "index": 111,
+      "intrinsic_dimension": 70
+    },
+    {
+      "index": 112,
+      "intrinsic_dimension": 73
+    },
+    {
+      "index": 113,
+      "intrinsic_dimension": 66
+    },
+    {
+      "index": 114,
+      "intrinsic_dimension": 67
+    },
+    {
+      "index": 115,
+      "intrinsic_dimension": 64
+    },
+    {
+      "index": 116,
+      "intrinsic_dimension": 86
+    },
+    {
+      "index": 117,
+      "intrinsic_dimension": 107
+    },
+    {
+      "index": 118,
+      "intrinsic_dimension": 87
+    },
+    {
+      "index": 119,
+      "intrinsic_dimension": 76
+    },
+    {
+      "index": 120,
+      "intrinsic_dimension": 84
+    },
+    {
+      "index": 121,
+      "intrinsic_dimension": 82
+    },
+    {
+      "index": 122,
+      "intrinsic_dimension": 76
+    },
+    {
+      "index": 123,
+      "intrinsic_dimension": 88
+    },
+    {
+      "index": 124,
+      "intrinsic_dimension": 81
+    },
+    {
+      "index": 125,
+      "intrinsic_dimension": 91
+    },
+    {
+      "index": 126,
+      "intrinsic_dimension": 67
+    },
+    {
+      "index": 127,
+      "intrinsic_dimension": 78
+    },
+    {
+      "index": 128,
+      "intrinsic_dimension": 73
+    },
+    {
+      "index": 129,
+      "intrinsic_dimension": 81
+    },
+    {
+      "index": 130,
+      "intrinsic_dimension": 89
+    },
+    {
+      "index": 131,
+      "intrinsic_dimension": 73
+    },
+    {
+      "index": 132,
+      "intrinsic_dimension": 84
+    },
+    {
+      "index": 133,
+      "intrinsic_dimension": 77
+    },
+    {
+      "index": 134,
+      "intrinsic_dimension": 73
+    },
+    {
+      "index": 135,
+      "intrinsic_dimension": 59
+    },
+    {
+      "index": 136,
+      "intrinsic_dimension": 78
+    },
+    {
+      "index": 137,
+      "intrinsic_dimension": 81
+    },
+    {
+      "index": 138,
+      "intrinsic_dimension": 80
+    },
+    {
+      "index": 139,
+      "intrinsic_dimension": 84
+    },
+    {
+      "index": 140,
+      "intrinsic_dimension": 86
+    },
+    {
+      "index": 141,
+      "intrinsic_dimension": 67
+    },
+    {
+      "index": 142,
+      "intrinsic_dimension": 69
+    },
+    {
+      "index": 143,
+      "intrinsic_dimension": 84
+    },
+    {
+      "index": 144,
+      "intrinsic_dimension": 74
+    },
+    {
+      "index": 145,
+      "intrinsic_dimension": 78
+    },
+    {
+      "index": 146,
+      "intrinsic_dimension": 82
+    },
+    {
+      "index": 147,
+      "intrinsic_dimension": 88
+    },
+    {
+      "index": 148,
+      "intrinsic_dimension": 80
+    },
+    {
+      "index": 149,
+      "intrinsic_dimension": 63
+    },
+    {
+      "index": 150,
+      "intrinsic_dimension": 81
+    },
+    {
+      "index": 151,
+      "intrinsic_dimension": 76
+    },
+    {
+      "index": 152,
+      "intrinsic_dimension": 97
+    },
+    {
+      "index": 153,
+      "intrinsic_dimension": 74
+    },
+    {
+      "index": 154,
+      "intrinsic_dimension": 74
+    },
+    {
+      "index": 155,
+      "intrinsic_dimension": 76
+    },
+    {
+      "index": 156,
+      "intrinsic_dimension": 78
+    },
+    {
+      "index": 157,
+      "intrinsic_dimension": 77
+    },
+    {
+      "index": 158,
+      "intrinsic_dimension": 72
+    },
+    {
+      "index": 159,
+      "intrinsic_dimension": 86
+    },
+    {
+      "index": 160,
+      "intrinsic_dimension": 62
+    },
+    {
+      "index": 161,
+      "intrinsic_dimension": 89
+    },
+    {
+      "index": 162,
+      "intrinsic_dimension": 79
+    },
+    {
+      "index": 163,
+      "intrinsic_dimension": 102
+    },
+    {
+      "index": 164,
+      "intrinsic_dimension": 82
+    },
+    {
+      "index": 165,
+      "intrinsic_dimension": 104
+    },
+    {
+      "index": 166,
+      "intrinsic_dimension": 74
+    },
+    {
+      "index": 167,
+      "intrinsic_dimension": 73
+    },
+    {
+      "index": 168,
+      "intrinsic_dimension": 100
+    },
+    {
+      "index": 169,
+      "intrinsic_dimension": 75
+    },
+    {
+      "index": 170,
+      "intrinsic_dimension": 85
+    },
+    {
+      "index": 171,
+      "intrinsic_dimension": 83
+    },
+    {
+      "index": 172,
+      "intrinsic_dimension": 70
+    },
+    {
+      "index": 173,
+      "intrinsic_dimension": 51
+    },
+    {
+      "index": 174,
+      "intrinsic_dimension": 93
+    },
+    {
+      "index": 175,
+      "intrinsic_dimension": 73
+    },
+    {
+      "index": 176,
+      "intrinsic_dimension": 61
+    },
+    {
+      "index": 177,
+      "intrinsic_dimension": 75
+    },
+    {
+      "index": 178,
+      "intrinsic_dimension": 101
+    },
+    {
+      "index": 179,
+      "intrinsic_dimension": 71
+    },
+    {
+      "index": 180,
+      "intrinsic_dimension": 77
+    },
+    {
+      "index": 181,
+      "intrinsic_dimension": 67
+    },
+    {
+      "index": 182,
+      "intrinsic_dimension": 92
+    },
+    {
+      "index": 183,
+      "intrinsic_dimension": 75
+    },
+    {
+      "index": 184,
+      "intrinsic_dimension": 104
+    },
+    {
+      "index": 185,
+      "intrinsic_dimension": 80
+    },
+    {
+      "index": 186,
+      "intrinsic_dimension": 66
+    },
+    {
+      "index": 187,
+      "intrinsic_dimension": 101
+    },
+    {
+      "index": 188,
+      "intrinsic_dimension": 71
+    },
+    {
+      "index": 189,
+      "intrinsic_dimension": 68
+    },
+    {
+      "index": 190,
+      "intrinsic_dimension": 76
+    },
+    {
+      "index": 191,
+      "intrinsic_dimension": 83
+    },
+    {
+      "index": 192,
+      "intrinsic_dimension": 76
+    },
+    {
+      "index": 193,
+      "intrinsic_dimension": 63
+    },
+    {
+      "index": 194,
+      "intrinsic_dimension": 74
+    },
+    {
+      "index": 195,
+      "intrinsic_dimension": 73
+    },
+    {
+      "index": 196,
+      "intrinsic_dimension": 88
+    },
+    {
+      "index": 197,
+      "intrinsic_dimension": 64
+    },
+    {
+      "index": 198,
+      "intrinsic_dimension": 80
+    },
+    {
+      "index": 199,
+      "intrinsic_dimension": 70
+    },
+    {
+      "index": 200,
+      "intrinsic_dimension": 120
+    },
+    {
+      "index": 201,
+      "intrinsic_dimension": 83
+    },
+    {
+      "index": 202,
+      "intrinsic_dimension": 99
+    },
+    {
+      "index": 203,
+      "intrinsic_dimension": 79
+    },
+    {
+      "index": 204,
+      "intrinsic_dimension": 72
+    },
+    {
+      "index": 205,
+      "intrinsic_dimension": 74
+    },
+    {
+      "index": 206,
+      "intrinsic_dimension": 83
+    },
+    {
+      "index": 207,
+      "intrinsic_dimension": 87
+    },
+    {
+      "index": 208,
+      "intrinsic_dimension": 77
+    },
+    {
+      "index": 209,
+      "intrinsic_dimension": 91
+    },
+    {
+      "index": 210,
+      "intrinsic_dimension": 76
+    },
+    {
+      "index": 211,
+      "intrinsic_dimension": 80
+    },
+    {
+      "index": 212,
+      "intrinsic_dimension": 79
+    },
+    {
+      "index": 213,
+      "intrinsic_dimension": 84
+    },
+    {
+      "index": 214,
+      "intrinsic_dimension": 81
+    },
+    {
+      "index": 215,
+      "intrinsic_dimension": 79
+    },
+    {
+      "index": 216,
+      "intrinsic_dimension": 83
+    },
+    {
+      "index": 217,
+      "intrinsic_dimension": 90
+    },
+    {
+      "index": 218,
+      "intrinsic_dimension": 81
+    },
+    {
+      "index": 219,
+      "intrinsic_dimension": 80
+    },
+    {
+      "index": 220,
+      "intrinsic_dimension": 69
+    },
+    {
+      "index": 221,
+      "intrinsic_dimension": 69
+    },
+    {
+      "index": 222,
+      "intrinsic_dimension": 87
+    },
+    {
+      "index": 223,
+      "intrinsic_dimension": 68
+    },
+    {
+      "index": 224,
+      "intrinsic_dimension": 90
+    },
+    {
+      "index": 225,
+      "intrinsic_dimension": 77
+    },
+    {
+      "index": 226,
+      "intrinsic_dimension": 79
+    },
+    {
+      "index": 227,
+      "intrinsic_dimension": 69
+    },
+    {
+      "index": 228,
+      "intrinsic_dimension": 83
+    },
+    {
+      "index": 229,
+      "intrinsic_dimension": 87
+    },
+    {
+      "index": 230,
+      "intrinsic_dimension": 84
+    },
+    {
+      "index": 231,
+      "intrinsic_dimension": 78
+    },
+    {
+      "index": 232,
+      "intrinsic_dimension": 93
+    },
+    {
+      "index": 233,
+      "intrinsic_dimension": 93
+    },
+    {
+      "index": 234,
+      "intrinsic_dimension": 87
+    },
+    {
+      "index": 235,
+      "intrinsic_dimension": 79
+    },
+    {
+      "index": 236,
+      "intrinsic_dimension": 99
+    },
+    {
+      "index": 237,
+      "intrinsic_dimension": 71
+    },
+    {
+      "index": 238,
+      "intrinsic_dimension": 107
+    },
+    {
+      "index": 239,
+      "intrinsic_dimension": 71
+    },
+    {
+      "index": 240,
+      "intrinsic_dimension": 89
+    },
+    {
+      "index": 241,
+      "intrinsic_dimension": 98
+    },
+    {
+      "index": 242,
+      "intrinsic_dimension": 71
+    },
+    {
+      "index": 243,
+      "intrinsic_dimension": 69
+    },
+    {
+      "index": 244,
+      "intrinsic_dimension": 73
+    },
+    {
+      "index": 245,
+      "intrinsic_dimension": 98
+    },
+    {
+      "index": 246,
+      "intrinsic_dimension": 80
+    },
+    {
+      "index": 247,
+      "intrinsic_dimension": 79
+    },
+    {
+      "index": 248,
+      "intrinsic_dimension": 81
+    },
+    {
+      "index": 249,
+      "intrinsic_dimension": 94
+    },
+    {
+      "index": 250,
+      "intrinsic_dimension": 113
+    },
+    {
+      "index": 251,
+      "intrinsic_dimension": 60
+    },
+    {
+      "index": 252,
+      "intrinsic_dimension": 67
+    },
+    {
+      "index": 253,
+      "intrinsic_dimension": 76
+    }
+  ]
+}

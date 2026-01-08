@@ -23,23 +23,28 @@ from transformers.utils import PushToHubMixin
 
 from .adapters_utils import CONFIG_NAME
 
-
+# 定义peft各个方法字段
 class PeftType(str, enum.Enum):
     PROMPT_TUNING = "PROMPT_TUNING"
     P_TUNING = "P_TUNING"
     PREFIX_TUNING = "PREFIX_TUNING"
     LORA = "LORA"
     BOTTLENECK = "BOTTLENECK"
+    ADALORA = "ADALORA"
+    QLORA = "QLORA"
 
 
-
+# 定义任务类型字段
 class TaskType(str, enum.Enum):
     SEQ_CLS = "SEQ_CLS"
     SEQ_2_SEQ_LM = "SEQ_2_SEQ_LM"
     CAUSAL_LM = "CAUSAL_LM"
     TOKEN_CLS = "TOKEN_CLS"
 
-
+# 基础配置类，：
+# 继承 PushToHubMixin 类，包含将模型推送到 Hub 的方法。
+# save_pretrained 方法将配置保存到目录中。
+# from_pretrained 方法从目录中加载配置。
 @dataclass
 class PeftConfigMixin(PushToHubMixin):
     r"""
@@ -53,13 +58,15 @@ class PeftConfigMixin(PushToHubMixin):
     """
     peft_type: Optional[PeftType] = field(default=None, metadata={"help": "The type of PEFT model."})
 
+    # 将配置类实例转换为字典，便于序列化（如保存维JSON）
     @property
     def __dict__(self):
-        return asdict(self)
+        return asdict(self) #将数据类实例转换为字典
 
     def to_dict(self):
-        return self.__dict__
+        return self.__dict__ #返回配置的字典表示形式
 
+    # 将配置类实例保存到目录中
     def save_pretrained(self, save_directory, **kwargs):
         r"""
         This method saves the configuration of your adapter model in a directory.
@@ -83,6 +90,7 @@ class PeftConfigMixin(PushToHubMixin):
         with open(output_path, "w") as writer:
             writer.write(json.dumps(output_dict, indent=2, sort_keys=True))
 
+    # 从目录中加载配置，优先从本地文件加载，其次尝试从HuggingFace Hub下载
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, **kwargs):
         r"""
@@ -111,7 +119,7 @@ class PeftConfigMixin(PushToHubMixin):
                 setattr(config, key, value)
 
         return config
-
+    # 从JSON文件加载配置
     @classmethod
     def from_json_file(cls, path_json_file, **kwargs):
         r"""
@@ -126,7 +134,8 @@ class PeftConfigMixin(PushToHubMixin):
 
         return json_object
 
-
+# 核心配置类，继承自PeftConfigMixin
+# 是所有 PEFT 方法的通用配置类，包含基础模型信息、方法类型、任务类型等核心参数。
 @dataclass
 class PeftConfig(PeftConfigMixin):
     """

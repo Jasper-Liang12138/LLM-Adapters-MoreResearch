@@ -1,9 +1,11 @@
-accelerate
+accelerate==0.24.1
 appdirs
-bitsandbytes
+bitsandbytes==0.41.3.post2
 black
 black[jupyter]
 datasets
 fire
-git+https://github.com/huggingface/transformers.git
+transformers==4.36.0
 gradio
+sentencepiece
+

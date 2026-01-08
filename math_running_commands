@@ -1,14 +1,15 @@
 # LLaMA-7B-LORA
-CUDA_VISIBLE_DEVICES=0 python finetune.py   --base_model 'yahma/llama-7b-hf'   --data_path 'math_10k.json'   --output_dir './trained_models/llama-7b-lora-math/'   --batch_size 16  --micro_batch_size 4   --num_epochs 3   --learning_rate 3e-4   --cutoff_len 256   --val_set_size 0 --eval_step 80 --save_step 80  --adapter_name lora --target_modules '["q_proj", "k_proj", "v_proj", "up_proj", "down_proj"]' --lora_r 32 --lora_alpha 64
+CUDA_VISIBLE_DEVICES=0 python finetune.py   --base_model 'yahma/llama-7b-hf'   --data_path 'ft-training_set/math_10k.json'   --output_dir './trained_models/llama-7b-qlora-math/'   --batch_size 16  --micro_batch_size 4   --num_epochs 3   --learning_rate 3e-4   --cutoff_len 256   --val_set_size 0 --eval_step 80 --save_step 80  --adapter_name qlora --target_modules '["q_proj", "k_proj", "v_proj", "up_proj", "down_proj"]' --lora_r 32 --lora_alpha 64
+#adalora, qlora
 
 # LLaMA-7B-prefix
 CUDA_VISIBLE_DEVICES=0 python finetune.py   --base_model 'yahma/llama-7b-hf'   --data_path 'math_10k.json'   --output_dir './trained_models/llama-7b-prefix-math-vt10/'   --batch_size 8  --micro_batch_size 4   --num_epochs 5   --learning_rate 3e-2   --cutoff_len 256   --val_set_size 120 --eval_step 10 --save_step 10  --adapter_name prefix-tuning --num_virtual_tokens 10
 
 # LLaMA-7B-series
-CUDA_VISIBLE_DEVICES=0 python finetune.py   --base_model 'yahma/llama-7b-hf'   --data_path 'math_10k.json'   --output_dir './trained_models/llama-7b-bottleneck-math-attn/'   --batch_size 16  --micro_batch_size 4   --num_epochs 3   --learning_rate 3e-4   --cutoff_len 256   --val_set_size 120 --eval_step 80 --save_step 80  --adapter_name bottleneck --load_8bit --target_modules '["up_proj", "gate_proj"]'
+CUDA_VISIBLE_DEVICES=0 python finetune.py   --base_model 'yahma/llama-7b-hf'   --data_path 'ft-training_set/commonsense_170k.json'   --output_dir './trained_models/llama-7b-bottleneck-math-attn/'   --batch_size 16  --micro_batch_size 4   --num_epochs 3   --learning_rate 3e-4   --cutoff_len 256   --val_set_size 120 --eval_step 80 --save_step 80  --adapter_name bottleneck --target_modules '["up_proj", "gate_proj"]'
 
 # LLaMA-7B-Parallel
-CUDA_VISIBLE_DEVICES=0 python finetune.py   --base_model 'yahma/llama-7b-hf'   --data_path 'math_10k.json'   --output_dir './trained_models/llama-7b-parallel-math/'   --batch_size 16  --micro_batch_size 4   --num_epochs 3   --learning_rate 3e-4   --cutoff_len 256   --val_set_size 0 --eval_step 80 --save_step 80  --adapter_name bottleneck --use_parallel_adapter --target_modules '["up_proj", "down_proj"]' 
+CUDA_VISIBLE_DEVICES=0 python finetune.py   --base_model 'yahma/llama-7b-hf'   --data_path 'ft-training_set/math_10k.json'   --output_dir './trained_models/llama-7b-parallel-math-128/'   --batch_size 16  --micro_batch_size 4   --num_epochs 3   --learning_rate 3e-4   --cutoff_len 256   --val_set_size 0 --eval_step 80 --save_step 80  --adapter_name bottleneck --use_parallel_adapter --bottleneck_size 128 --target_modules '["up_proj", "down_proj"]' 
 
 #For LLaMA-13B models, we use `--use_gradient_checkpointing` to save memory
 
@@ -32,3 +33,67 @@ CUDA_VISIBLE_DEVICES=0 python finetune.py   --base_model 'EleutherAI/gpt-j-6b'  
 
 # GPT-6B-Parallel
 CUDA_VISIBLE_DEVICES=0 python finetune.py   --base_model 'EleutherAI/gpt-j-6b'   --data_path 'math_10k.json'   --output_dir './trained_models/gptj-6b-parallel-math-mlp-bs256/'   --batch_size 16  --micro_batch_size 4   --num_epochs 3   --learning_rate 3e-4   --cutoff_len 256   --val_set_size 0 --eval_step 80 --save_step 80  --adapter_name bottleneck --use_parallel_adapter --load_8bit --target_modules '["fc_in", "fc_out"]'
+
+
+
+# 针对单个数据集 #AQuA/piqa
+CUDA_VISIBLE_DEVICES=0 python compute_intrinsic_dimension.py \
+  --base_model 'yahma/llama-7b-hf' \
+  --lora_weights train_models/lora-grpo-enhanced \
+  --dataset AQuA \
+  --model_name LLaMA-7B \
+  --output_dir ./intrinsic_results/intrinsic_dimesion_lora_grpo_aqua
+
+# 或针对多个数据集
+CUDA_VISIBLE_DEVICES=0 python compute_intrinsic_dimension.py \
+  --base_model /path/to/base/model \
+  --lora_weights /path/to/lora/weights \
+  --dataset \"AQuA,commonsense_15k\" \
+  --variance_threshold 0.9
+
+# 计算隐藏层表示的内在维度
+  CUDA_VISIBLE_DEVICES=0 python compute_intrinsic_from_hidden.py \
+  --base_model 'yahma/llama-7b-hf' \
+  --lora_weights trained_models/llama-7b-qlora-commonsense \
+  --dataset piqa \
+  --model_name LLaMA-7B \
+  --output_dir ./hidden_results/intrinsic_dimesion_qlora_piqa
+
+#tf_grpo
+python finetune.py \
+    --base_model 'yahma/llama-7b-hf' \
+    --data_path 'ft-training_set/commonsense_15k.json' \
+    --output_dir './trained_models/llama-7b-lora-commonsense' \
+    --batch_size 16 \
+    --micro_batch_size 4 \
+    --num_epochs 3 \
+    --learning_rate 3e-4 \
+    --cutoff_len 256 \
+    --val_set_size 0 \
+    --eval_step 80 \
+    --adapter_name lora \
+    --target_modules '["q_proj", "k_proj", "v_proj", "up_proj", "down_proj"]' \
+    --lora_r 32 \
+    --lora_alpha 64 \
+    --use_tf_grpo True \
+    --grpo_group_size 3 
+
+
+#tf_grpo
+python finetune.py \
+    --base_model 'yahma/llama-7b-hf' \
+    --data_path 'ft-training_set/commonsense_15k.json' \
+    --output_dir './trained_models/llama-7b-qlora-commonsense' \
+    --batch_size 16 \
+    --micro_batch_size 4 \
+    --num_epochs 3 \
+    --learning_rate 3e-4 \
+    --cutoff_len 256 \
+    --val_set_size 0 \
+    --eval_step 80 \
+    --save_step 80 \
+    --adapter_name qlora \
+    --target_modules '["q_proj", "k_proj", "v_proj", "up_proj", "down_proj"]' \
+    --lora_r 32 \
+    --lora_alpha 64 \
+    --use_tf_grpo False 

@@ -1,6 +1,9 @@
 import os
 import sys
 
+# 将peft的src目录添加到Python路径，确保能导入peft模块
+sys.path.append(os.path.join(os.getcwd(), "peft/src/"))
+
 import fire
 import gradio as gr
 import torch
@@ -136,7 +139,7 @@ def main(
             ),
         ],
         outputs=[
-            gr.inputs.Textbox(
+            gr.components.Textbox(
                 lines=5,
                 label="Output",
             )

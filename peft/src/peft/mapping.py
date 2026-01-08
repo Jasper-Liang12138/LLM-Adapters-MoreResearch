@@ -20,7 +20,7 @@ from .peft_model import (
     PeftModelForSequenceClassification,
     PeftModelForTokenClassification,
 )
-from .tuners import LoraConfig, PrefixTuningConfig, PromptEncoderConfig, PromptTuningConfig, BottleneckConfig
+from .tuners import LoraConfig, PrefixTuningConfig, PromptEncoderConfig, PromptTuningConfig, BottleneckConfig, AdaLoraConfig, QLoRAConfig
 from .utils import PromptLearningConfig
 
 
@@ -37,6 +37,8 @@ PEFT_TYPE_TO_CONFIG_MAPPING = {
     "P_TUNING": PromptEncoderConfig,
     "LORA": LoraConfig,
     "BOTTLENECK": BottleneckConfig,
+    "ADALORA": AdaLoraConfig,
+    "QLORA": QLoRAConfig,
 }
 
 TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING = {
@@ -172,7 +174,30 @@ def _prepare_bottleneck_config(peft_config, model_config):
 
     return peft_config
     
+def _prepare_adalora_config(peft_config, model_config):
+    if peft_config.target_modules is None:
+        if model_config["model_type"] not in TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING:
+            raise ValueError("Please specify `target_modules` in `peft_config`")
+        peft_config.target_modules = TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING[model_config["model_type"]]
+    if len(peft_config.target_modules) == 1:
+        peft_config.fan_in_fan_out = True
+    if peft_config.inference_mode:
+        peft_config.merge_weights = True
+    return peft_config
 
+
+def _prepare_qlora_config(peft_config, model_config):
+    # QLoRA uses the same target modules as LoRA
+    if peft_config.target_modules is None:
+        if model_config["model_type"] not in TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING:
+            raise ValueError("Please specify `target_modules` in `peft_config`")
+        peft_config.target_modules = TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING[model_config["model_type"]]
+    if len(peft_config.target_modules) == 1:
+        peft_config.fan_in_fan_out = True
+    if peft_config.inference_mode:
+        peft_config.merge_weights = True
+    return peft_config
+    
 
 def get_peft_model(model, peft_config):
     """
@@ -192,11 +217,21 @@ def get_peft_model(model, peft_config):
         elif peft_config.peft_type == "BOTTLENECK":
             peft_config = _prepare_bottleneck_config(peft_config, model_config)
             return PeftModel(model, peft_config)
+        elif peft_config.peft_type == "ADALORA":
+            peft_config = _prepare_adalora_config(peft_config, model_config)
+            return PeftModel(model, peft_config)
+        elif peft_config.peft_type == "QLORA":
+            peft_config = _prepare_qlora_config(peft_config, model_config)
+            return PeftModel(model, peft_config)
     if not isinstance(peft_config, PromptLearningConfig):
         if peft_config.peft_type == "BOTTLENECK":
             peft_config = _prepare_bottleneck_config(peft_config, model_config)
         elif peft_config.peft_type == "LORA":
             peft_config = _prepare_lora_config(peft_config, model_config)
+        elif peft_config.peft_type == "ADALORA":
+            peft_config = _prepare_adalora_config(peft_config, model_config)
+        elif peft_config.peft_type == "QLORA":
+            peft_config = _prepare_qlora_config(peft_config, model_config)
     else:
         peft_config = _prepare_prompt_learning_config(peft_config, model_config)
     return MODEL_TYPE_TO_PEFT_MODEL_MAPPING[peft_config.task_type](model, peft_config)

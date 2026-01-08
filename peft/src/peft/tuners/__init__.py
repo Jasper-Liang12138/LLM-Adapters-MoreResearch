@@ -22,3 +22,5 @@ from .bottleneck import BottleneckConfig, BottleneckModel
 from .p_tuning import PromptEncoder, PromptEncoderConfig, PromptEncoderReparameterizationType
 from .prefix_tuning import PrefixEncoder, PrefixTuningConfig
 from .prompt_tuning import PromptEmbedding, PromptTuningConfig, PromptTuningInit
+from .adalora import AdaLoraConfig, AdaLoraModel
+from .qlora import QLoRAConfig, QLoRAModel

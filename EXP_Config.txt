@@ -1,0 +1,76 @@
+CUDA_VISIBLE_DEVICES=0 python finetune.py \
+  --base_model 'yahma/llama-7b-hf' \
+  --data_path '/root/autodl-tmp/LLM_Adapters/LLM_Adapters/ft-training_set/math_10k.json' \
+  --output_dir './trained_models/llama-lora-Attn_and_MLP' \
+  --batch_size 16 \
+  --micro_batch_size 4 \
+  --num_epochs 3 \
+  --learning_rate 3e-4 \
+  --cutoff_len 256 \
+  --val_set_size 120 \
+  --adapter_name lora \
+  --lora_r 8 \
+  --lora_alpha 16 \
+  --lora_dropout 0.05 \
+  --lora_target_modules "q_proj k_proj v_proj o_proj gate_proj up_proj down_proj"
+
+CUDA_VISIBLE_DEVICES=0 torchrun generate.py \
+    --base_model 'yahma/llama-7b-hf' \
+    --lora_weights './trained_models/llama-lora'
+
+transformers==4.36.0
+
+CUDA_VISIBLE_DEVICES=0 python finetune.py \
+  --base_model 'yahma/llama-7b-hf' \
+  --data_path '/root/autodl-tmp/LLM_Adapters/LLM_Adapters/ft-training_set/math_10k.json' \
+  --output_dir './trained_models/llama-lora-Attn' \
+  --batch_size 16 \
+  --micro_batch_size 4 \
+  --num_epochs 3 \
+  --learning_rate 3e-4 \
+  --cutoff_len 256 \
+  --val_set_size 120 \
+  --adapter_name lora \
+  --lora_r 8 \
+  --lora_alpha 16 \
+  --lora_dropout 0.05 \
+  --lora_target_modules "q_proj k_proj v_proj o_proj"
+
+CUDA_VISIBLE_DEVICES=0 python finetune.py \
+  --base_model 'yahma/llama-7b-hf' \
+  --data_path '/root/autodl-tmp/LLM_Adapters/LLM_Adapters/ft-training_set/math_10k.json' \
+  --output_dir './trained_models/llama-lora-MLP' \
+  --batch_size 16 \
+  --micro_batch_size 4 \
+  --num_epochs 3 \
+  --learning_rate 3e-4 \
+  --cutoff_len 256 \
+  --val_set_size 120 \
+  --adapter_name lora \
+  --lora_r 8 \
+  --lora_alpha 16 \
+  --lora_dropout 0.05 \
+  --lora_target_modules "gate_proj up_proj down_proj"
+
+['AddSub', 'MultiArith', 'SingleEq', 'gsm8k', 'AQuA', 'SVAMP']
+
+CUDA_VISIBLE_DEVICES=0 python evaluate.py \
+    --model LLaMA-7B \
+    --adapter AdaLoRA \
+    --dataset AQuA \
+    --base_model 'yahma/llama-7b-hf' \
+    --lora_weights 'train_models/adalora-grpo-enhanced-math'
+
+CUDA_VISIBLE_DEVICES=0 python commonsense_evaluate.py \
+    --model LLaMA-7B \
+    --adapter QLoRA \
+    --dataset piqa \
+    --base_model 'yahma/llama-7b-hf' \
+    --lora_weights 'trained_models/llama-7b-qlora-commonsense' \
+    --batch_size 2 
+
+ssh -p 29703 root@connect.westc.gpuhub.com
+
+scp -rP 29703 /root/autodl-tmp/LLM_Adapters root@connect.westc.gpuhub.com:/root/autodl-tmp/
+
+cd /root/autodl-tmp/ &&  tar cf - * | ssh -p 29703 root@connect.westc.gpuhub.com "cd /root/autodl-tmp && tar xf -"

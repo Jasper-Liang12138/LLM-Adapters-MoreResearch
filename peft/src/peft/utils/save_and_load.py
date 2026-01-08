@@ -16,28 +16,29 @@
 from .config import PeftType
 
 
-def get_peft_model_state_dict(model, state_dict=None):
-    """
-    Get the state dict of the Peft model.
+from .config import PeftType
 
-    Args:
-        model ([`PeftModel`]): The Peft model. When using torch.nn.DistributedDataParallel, DeepSpeed or FSDP,
-        the model should be the underlying model/unwrapped model (i.e. model.module).
-        state_dict (`dict`, *optional*, defaults to `None`):
-            The state dict of the model. If not provided, the state dict of the model
-        will be used.
-    """
+
+def get_peft_model_state_dict(model, state_dict=None):
     if state_dict is None:
         state_dict = model.state_dict()
-    if model.peft_config.peft_type == PeftType.LORA:
-        # to_return = lora_state_dict(model, bias=model.peft_config.bias)
-        # adapted from `https://github.com/microsoft/LoRA/blob/main/loralib/utils.py`
-        # to directly with the state dict which is necessary when using DeepSpeed or FSDP
-        bias = model.peft_config.bias
+
+    peft_type = model.peft_config.peft_type
+
+    # =========================
+    # 1. LoRA / AdaLoRA / QLoRA
+    # =========================
+    if peft_type in {PeftType.LORA, PeftType.ADALORA, PeftType.QLORA}:
+        bias = getattr(model.peft_config, "bias", "none")
+
         if bias == "none":
             to_return = {k: state_dict[k] for k in state_dict if "lora_" in k}
         elif bias == "all":
-            to_return = {k: state_dict[k] for k in state_dict if "lora_" in k or "bias" in k}
+            to_return = {
+                k: state_dict[k]
+                for k in state_dict
+                if "lora_" in k or "bias" in k
+            }
         elif bias == "lora_only":
             to_return = {}
             for k in state_dict:
@@ -48,13 +49,20 @@ def get_peft_model_state_dict(model, state_dict=None):
                         to_return[bias_name] = state_dict[bias_name]
         else:
             raise NotImplementedError
-    elif model.peft_config.peft_type == PeftType.BOTTLENECK:
-        # return the state dict of the model with Bottleneck adapters
+
+    # =========================
+    # 2. Bottleneck Adapter
+    # =========================
+    elif peft_type == PeftType.BOTTLENECK:
         bias = model.peft_config.bias
         if bias == "none":
             to_return = {k: state_dict[k] for k in state_dict if "adapter_" in k}
         elif bias == "all":
-            to_return = {k: state_dict[k] for k in state_dict if "adapter_" in k or "bias" in k}
+            to_return = {
+                k: state_dict[k]
+                for k in state_dict
+                if "adapter_" in k or "bias" in k
+            }
         elif bias == "adapter_only":
             to_return = {}
             for k in state_dict:
@@ -65,32 +73,49 @@ def get_peft_model_state_dict(model, state_dict=None):
                         to_return[bias_name] = state_dict[bias_name]
         else:
             raise NotImplementedError
-    else:
+
+    # =========================
+    # 3. Prompt-learning only
+    # =========================
+    elif peft_type in {
+        PeftType.PREFIX_TUNING,
+        PeftType.PROMPT_TUNING,
+        PeftType.P_TUNING,
+    }:
         to_return = {}
         if model.peft_config.inference_mode:
             prompt_embeddings = model.prompt_encoder.embedding.weight
         else:
             prompt_embeddings = model.get_prompt_embedding_to_save()
         to_return["prompt_embeddings"] = prompt_embeddings
+
+    else:
+        raise ValueError(f"Unsupported peft_type: {peft_type}")
+
+    # =========================
+    # 4. Modules to save
+    # =========================
     if model.modules_to_save is not None:
         for key, value in state_dict.items():
             if any(module_name in key for module_name in model.modules_to_save):
                 to_return[key] = value
+
     return to_return
 
 
+
 def set_peft_model_state_dict(model, peft_model_state_dict):
-    """
-    Set the state dict of the Peft model.
-
-    Args:
-        model ([`PeftModel`]): The Peft model.
-        peft_model_state_dict (`dict`): The state dict of the Peft model.
-    """
-
     model.load_state_dict(peft_model_state_dict, strict=False)
-    if model.peft_config.peft_type != PeftType.LORA and model.peft_config.peft_type != PeftType.BOTTLENECK:
+
+    if model.peft_config.peft_type in {
+        PeftType.PREFIX_TUNING,
+        PeftType.PROMPT_TUNING,
+        PeftType.P_TUNING,
+    }:
         model.prompt_encoder.embedding.load_state_dict(
-            {"weight": peft_model_state_dict["prompt_embeddings"]}, strict=True
+            {"weight": peft_model_state_dict["prompt_embeddings"]},
+            strict=True,
         )
+
     return model
+
