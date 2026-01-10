@@ -61,10 +61,53 @@ class TF_GRPO:
     def embed_func(self, text: str):
         # tokenization
         inputs = self.tokenizer(text, return_tensors="pt", truncation=True, max_length=512).to(self.model.device)
-        # 获取 input embedding
+        input_ids = inputs["input_ids"]
+        attention_mask = inputs.get("attention_mask", None)
+        
+        # 获取隐藏层表征
         with torch.no_grad():
-            token_embs = self.model.get_input_embeddings()(inputs["input_ids"])  # [1, seq_len, hidden_size]
-            sent_emb = token_embs.mean(dim=1)  # [1, hidden_size] 对 seq_len 取平均
+            # 尝试获取 base_model 以确保能获取 hidden states
+            base = None
+            if hasattr(self.model, 'get_base_model'):
+                try:
+                    base = self.model.get_base_model()
+                except Exception:
+                    base = None
+            if base is None:
+                # fallback to common attributes
+                base = getattr(self.model, 'base_model', self.model)
+            
+            # 通过 forward pass 获取隐藏层输出
+            outputs = base(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                output_hidden_states=True,
+                return_dict=True
+            )
+            
+            # 获取最后一层的隐藏状态
+            last_hidden = getattr(outputs, 'last_hidden_state', None)
+            if last_hidden is None:
+                hidden_states = getattr(outputs, 'hidden_states', None)
+                if hidden_states:
+                    last_hidden = hidden_states[-1]  # [1, seq_len, hidden_size]
+                else:
+                    raise RuntimeError('模型未返回 last_hidden_state 或 hidden_states，无法计算隐藏层表征')
+            
+            # 使用 attention_mask 进行 mean pooling（只对有效 token 取平均）
+            if attention_mask is not None:
+                # 扩展 attention_mask 维度用于广播: [1, seq_len] -> [1, seq_len, 1]
+                mask_expanded = attention_mask.unsqueeze(-1).float()
+                # 将 padding 位置的 hidden state 置为 0
+                masked_hidden = last_hidden * mask_expanded
+                # 对有效 token 取平均
+                sum_hidden = masked_hidden.sum(dim=1)  # [1, hidden_size]
+                seq_lengths = attention_mask.sum(dim=1, keepdim=True).float()  # [1, 1]
+                sent_emb = sum_hidden / seq_lengths  # [1, hidden_size]
+            else:
+                # 如果没有 attention_mask，直接对所有 token 取平均
+                sent_emb = last_hidden.mean(dim=1)  # [1, hidden_size]
+        
         return sent_emb.cpu().numpy()[0]  # 返回 1D np.array
 
     # ===================== pθ(y | x, E) =====================
