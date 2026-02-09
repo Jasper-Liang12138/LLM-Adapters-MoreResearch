@@ -5,7 +5,8 @@ import sys
 # 强制 NPU 保持原图数据类型，禁止私自转 FP16，这是解决溢出的关键
 os.environ["ACL_PRECISION_MODE"] = "must_keep_origin_dtype"
 # 优化显存分配，防止碎片化 - 使用更大的块大小减少碎片
-os.environ["PYTORCH_NPU_ALLOC_CONF"] = "max_split_size_mb:512"
+# 对于 7B 模型，使用更大的块可以减少碎片，但需要平衡
+os.environ["PYTORCH_NPU_ALLOC_CONF"] = "max_split_size_mb:1024"
 # 禁止某些可能导致 Inner Error 的融合算子
 os.environ["LCCL_DETERMINISTIC"] = "1"
 os.environ["HCC_DETERMINISTIC"] = "1"
@@ -106,14 +107,16 @@ def train(
         torch.npu.synchronize()
     
     # 进程间错开加载时间，避免同时加载导致内存峰值过高
+    # 增加延迟时间，确保前面的进程完成加载
     if world_size > 1:
-        time.sleep(local_rank * 2)  # 每个进程延迟 2 秒，错开加载
+        time.sleep(local_rank * 4)  # 每个进程延迟 4 秒，更充分地错开加载
 
     print(f"Process rank {local_rank}/{world_size}: Loading model to NPU {local_rank}...")
 
-    # 计算每个设备的最大内存限制（留出一些余量用于训练）
-    # 60.96 GiB 总容量，为训练预留约 5-10 GiB
-    max_memory_per_device = {local_rank: "50GiB"}
+    # 计算每个设备的最大内存限制（留出更多余量用于训练和避免碎片）
+    # 60.96 GiB 总容量，7B 模型约需要 14-15 GiB，为训练和碎片预留更多空间
+    # 降低限制可以强制更早释放内存，减少碎片
+    max_memory_per_device = {local_rank: "45GiB"}
     
     # 直接加载到指定的 NPU 设备，使用低内存模式
     model = AutoModelForCausalLM.from_pretrained(
