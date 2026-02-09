@@ -94,51 +94,38 @@ def train(
     print(f"Finetuning Qwen2.5 on Ascend NPU with Full BF16 Precision...")
 
     world_size = int(os.environ.get("WORLD_SIZE", 1))
-    local_rank = int(os.environ.get("LOCAL_RANK", "0"))  # 获取当前进程的卡号
-    device_map = {"": local_rank}  # 显式指定该进程只使用对应的这块卡
+    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
 
-    # 清理 NPU 缓存，确保有足够内存加载模型
+    # 直接设置当前进程使用的设备
+    torch.npu.set_device(local_rank)
+    device = f'npu:{local_rank}'
+
+    # 清理当前 NPU 的缓存
     torch.npu.empty_cache()
-    # 强制同步，确保缓存清理完成
-    if torch.npu.is_available():
-        torch.npu.synchronize()
-    
-    # 进程间错开加载时间，避免同时加载导致内存峰值过高
-    # 增加延迟时间，确保前面的进程完成加载
-    if world_size > 1:
-        time.sleep(local_rank * 4)  # 每个进程延迟 4 秒，更充分地错开加载
 
-    print(f"Process rank {local_rank}/{world_size}: Loading model to NPU {local_rank}...")
+    # 进程间错开加载，避免同时读取模型文件导致 I/O 瓶颈
+    if world_size > 1 and local_rank > 0:
+        time.sleep(local_rank * 3)
 
-    # 计算每个设备的最大内存限制（留出更多余量用于训练和避免碎片）
-    # 60.96 GiB 总容量，7B 模型约需要 14-15 GiB，为训练和碎片预留更多空间
-    # 进一步降低限制，强制更早释放内存，减少碎片
-    # 注意：这个限制主要用于加载阶段，训练时会动态调整
-    max_memory_per_device = {local_rank: "40GiB"}
-    
-    # 直接加载到指定的 NPU 设备，使用低内存模式
+    print(f"Process rank {local_rank}/{world_size}: Loading model to {device}...")
+
+    # 简化加载：直接加载到指定设备，不使用 device_map 和 max_memory
+    # 这些参数在分布式训练时会导致设备分配混乱
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
         torch_dtype=torch.bfloat16,
-        device_map=device_map,
-        max_memory=max_memory_per_device,
-        low_cpu_mem_usage=True,  # 关键：减少 CPU 内存占用，优化加载过程
+        low_cpu_mem_usage=True,
         trust_remote_code=True,
         attn_implementation="eager"
     )
-    
-    # 加载完成后立即清理缓存，释放碎片内存
+
+    # 手动将模型移动到指定设备
+    model = model.to(device)
+
+    # 清理缓存
     torch.npu.empty_cache()
-    if torch.npu.is_available():
-        torch.npu.synchronize()
-    
-    # 等待所有进程完成模型加载，避免内存竞争
-    if world_size > 1:
-        import torch.distributed as dist
-        if dist.is_initialized():
-            dist.barrier()  # 同步点：等待所有进程完成加载
-    
-    print(f"Process rank {local_rank}: Model loaded successfully on NPU {local_rank}")
+
+    print(f"Process rank {local_rank}: Model loaded successfully on {device}")
 
     tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.eos_token
@@ -195,18 +182,6 @@ def train(
 
     target_modules = safe_list(target_modules, ["q_proj", "k_proj", "v_proj", "o_proj"])
 
-    # ### 修改点: NPU BFloat16 兼容性修复
-    # 确保所有参数都是 torch.nn.Parameter 类型，而不是原始 tensor
-    # 这解决了 NPU 上 BFloat16Tensor 导致的 PEFT 包装失败问题
-    for name, param in model.named_parameters():
-        if not isinstance(param, torch.nn.Parameter):
-            # 将原始 tensor 转换为 Parameter
-            parent_module = model
-            name_parts = name.split('.')
-            for part in name_parts[:-1]:
-                parent_module = getattr(parent_module, part)
-            setattr(parent_module, name_parts[-1], torch.nn.Parameter(param.data))
-
     if adapter_name == "lora":
         config = LoraConfig(
             r=lora_r,
@@ -249,18 +224,14 @@ def train(
             num_virtual_tokens=num_virtual_tokens,
             task_type="CAUSAL_LM",
         )
-    
-    # PEFT 包装前清理缓存，确保有足够内存创建 LoRA 层
-    torch.npu.empty_cache()
-    if torch.npu.is_available():
-        torch.npu.synchronize()
-    
+
     model = get_peft_model(model, config)
-    
-    # PEFT 包装后再次清理缓存
+
+    # PEFT 包装后清理缓存
     torch.npu.empty_cache()
+    # prefix-tuning 需要确保在正确的设备上（其他适配器已经在正确设备）
     if adapter_name == "prefix-tuning":
-        model.to(f'npu:{local_rank}')
+        model = model.to(device)
 
     # --- 启用梯度检查点以节省显存 ---
     if use_gradient_checkpointing:
@@ -284,15 +255,6 @@ def train(
             use_gradient_checkpointing = False
     else:
         print("ℹ️  Gradient checkpointing disabled")
-
-    # --- NPU 稳定性补丁：修复 RMSNorm 导致的 Inner Error ---
-    from transformers.models.qwen2.modeling_qwen2 import Qwen2RMSNorm
-
-    for name, module in model.named_modules():
-        if isinstance(module, Qwen2RMSNorm):
-            # 强制这些层在正向传播时转换类型，规避 NPU 算子 bug
-            module.float() 
-    # -----------------------------------------------------
 
     # 打印可训练参数，确认 LoRA 挂载正确
     model.print_trainable_parameters()
@@ -382,14 +344,12 @@ def train(
         ),
         data_collator=transformers.DataCollatorForSeq2Seq(tokenizer, pad_to_multiple_of=8, padding=True),
     )
-    # 防止 Qwen 的 token_type_ids 导致 NaN (Qwen 不需要这个，但有时会被自动加上)
-    if hasattr(model, "config"):
-        model.config.use_cache = False
 
-    # 强制清理一下内存
-    torch.npu.empty_cache()
-
+    # 禁用 KV cache（训练时不需要）
     model.config.use_cache = False
+
+    # 清理内存
+    torch.npu.empty_cache()
 
     # =================================================================
     # Training Loop with Curriculum Learning Support
