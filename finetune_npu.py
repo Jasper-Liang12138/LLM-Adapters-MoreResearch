@@ -99,11 +99,12 @@ def train(
     local_rank = int(os.environ.get("LOCAL_RANK") or 0)
     device_map = {"": local_rank}
 
-    # ### 修改点 3: 显式指定 torch_dtype 为 bfloat16
+    # ### 修改点 3: 不在加载时指定 dtype，让 PEFT 先包装模型
+    # 然后由 Trainer 的 bf16=True 来处理精度转换
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
         load_in_8bit=load_8bit,
-        torch_dtype=torch.bfloat16, 
+        # torch_dtype=torch.bfloat16,  # 注释掉，避免 NPU 上的 BFloat16Tensor 问题
         device_map=device_map,
         trust_remote_code=True,
         attn_implementation="eager" 
