@@ -28,7 +28,7 @@ torch_npu.npu.set_compile_mode(jit_compile=False)
 torch.npu.set_option({"ACL_PRECISION_MODE": "must_keep_origin_dtype"})
 
 import transformers
-from datasets import load_dataset, Dataset
+from datasets import load_dataset, Dataset, interleave_datasets
 from tqdm import tqdm
 
 sys.path.append(os.path.join(os.getcwd(), "peft/src/"))
@@ -85,10 +85,13 @@ def train(
         wandb_watch: str = "",
         wandb_log_model: str = "",
         resume_from_checkpoint: str = None,
-        use_tf_grpo: bool = False, 
-        grpo_group_size: int = 4, 
+        use_tf_grpo: bool = False,
+        grpo_group_size: int = 4,
         grpo_max_experiences: int = 50,
-        grpo_data_limit: int = -1, 
+        grpo_data_limit: int = -1,
+        # === Curriculum Learning 参数 ===
+        use_curriculum: bool = False,  # 是否启用课程学习
+        curriculum_seed: int = 42,  # 数据混合的随机种子
 ):
     print(f"Finetuning Qwen2.5 on Ascend NPU with Full BF16 Precision...")
     
@@ -124,6 +127,40 @@ def train(
             labels = [-100] * user_len + labels[user_len:]
             if len(labels) > len(full_tokens): labels = labels[:len(full_tokens)]
         return {"input_ids": full_tokens, "attention_mask": [1] * len(full_tokens), "labels": labels}
+
+    # === Curriculum Learning Helper Functions ===
+    def get_curriculum_probs(progress):
+        """
+        根据训练进度返回不同难度数据的采样概率
+        progress: 0.0 到 1.0 之间的训练进度
+        返回: [explain_prob, reasoning_prob, topology_prob]
+        """
+        if progress < 0.3:
+            # 早期阶段：主要学习解释性内容
+            return [0.8, 0.2, 0.0]
+        elif progress < 0.7:
+            # 中期阶段：平衡解释和推理
+            return [0.4, 0.4, 0.2]
+        else:
+            # 后期阶段：更多推理和拓扑内容
+            return [0.25, 0.35, 0.4]
+
+    def build_curriculum_dataset(explain_ds, reasoning_ds, topology_ds, progress):
+        """
+        根据训练进度动态构建混合数据集
+        """
+        probs = get_curriculum_probs(progress)
+        print(f"📚 Curriculum Progress: {progress:.2%} | Sampling Probs: Explain={probs[0]:.2f}, Reasoning={probs[1]:.2f}, Topology={probs[2]:.2f}")
+
+        # 使用 interleave_datasets 按概率混合数据
+        mixed_ds = interleave_datasets(
+            [explain_ds, reasoning_ds, topology_ds],
+            probabilities=probs,
+            seed=curriculum_seed,
+            stopping_strategy="all_exhausted"
+        )
+
+        return mixed_ds
 
     if load_8bit:
         model = prepare_model_for_int8_training(model, use_gradient_checkpointing=use_gradient_checkpointing)
@@ -204,31 +241,76 @@ def train(
     # 因为 Trainer 会根据 args.bf16 自动处理，手动转换有时会扰乱 Trainer 的状态
     
     data = load_dataset("json", data_files=data_path) if data_path.endswith(".json") else load_dataset(data_path)
-    train_data = data["train"].shuffle().map(generate_and_tokenize_prompt)
+
+    # === Curriculum Learning Data Preparation ===
+    explain_ds = None
+    reasoning_ds = None
+    topology_ds = None
+
+    if use_curriculum:
+        print("\n" + "="*50)
+        print("📚 Starting Curriculum Learning Setup")
+        print("Filtering dataset by difficulty levels...")
+        print("="*50 + "\n")
+
+        full_ds = data["train"]
+
+        # 检查数据集中是否有 difficulty 字段
+        if "difficulty" not in full_ds.column_names:
+            print("⚠️  Warning: 'difficulty' field not found in dataset. Disabling curriculum learning.")
+            use_curriculum = False
+            train_data = full_ds.shuffle().map(generate_and_tokenize_prompt)
+        else:
+            # 按难度过滤数据集
+            explain_ds = full_ds.filter(lambda x: x.get("difficulty") == "basic")
+            reasoning_ds = full_ds.filter(lambda x: x.get("difficulty") == "reasoning")
+            topology_ds = full_ds.filter(lambda x: x.get("difficulty") not in ["basic", "reasoning"])
+
+            # 如果没有 topology 数据，使用 reasoning 的一部分
+            if len(topology_ds) == 0:
+                print("⚠️  No 'topology' difficulty data found. Using reasoning data for topology stage.")
+                topology_ds = reasoning_ds
+
+            print(f"✅ Dataset split by difficulty:")
+            print(f"   - Explain (basic): {len(explain_ds)} samples")
+            print(f"   - Reasoning: {len(reasoning_ds)} samples")
+            print(f"   - Topology (advanced): {len(topology_ds)} samples")
+            print(f"   - Total: {len(full_ds)} samples\n")
+    else:
+        train_data = data["train"].shuffle().map(generate_and_tokenize_prompt)
 
     gradient_accumulation_steps = (batch_size // micro_batch_size) // world_size
-    
+
+    # 根据是否使用 curriculum learning 决定初始训练数据
+    if use_curriculum:
+        # Curriculum learning: 先用第一个 epoch 的数据（progress=0）
+        initial_progress = 0.0
+        initial_mixed_ds = build_curriculum_dataset(explain_ds, reasoning_ds, topology_ds, initial_progress)
+        initial_train_data = initial_mixed_ds.shuffle().map(generate_and_tokenize_prompt)
+    else:
+        initial_train_data = train_data
+
     # ### 修改点 5: 核心修复 - 开启 bf16=True
     # 这会告诉 Trainer 不要使用 GradScaler，因为 BF16 不需要缩放。
     # 彻底解决 "Loss scaler reducing loss scale to 0.0" 问题
-    
+
     trainer = transformers.Trainer(
         model=model,
-        train_dataset=train_data,
+        train_dataset=initial_train_data,
         args=transformers.TrainingArguments(
             per_device_train_batch_size=micro_batch_size,
             gradient_accumulation_steps=gradient_accumulation_steps,
             warmup_steps=100,
-            num_train_epochs=num_epochs,
+            num_train_epochs=1 if use_curriculum else num_epochs,  # Curriculum: 每次训练1个epoch
             learning_rate=learning_rate,
-            
+
             # --- 关键修改 ---
             bf16=True,      # 必须开启！这会禁用 FP16 GradScaler
             fp16=False,     # 确保关闭 FP16
             optim="adamw_torch",
             # ----------------
-            
-            dataloader_pin_memory=False, 
+
+            dataloader_pin_memory=False,
             logging_steps=10,
             save_strategy="steps",
             save_steps=save_step,
@@ -242,12 +324,53 @@ def train(
     # 防止 Qwen 的 token_type_ids 导致 NaN (Qwen 不需要这个，但有时会被自动加上)
     if hasattr(model, "config"):
         model.config.use_cache = False
-    
+
     # 强制清理一下内存
     torch.npu.empty_cache()
-    
+
     model.config.use_cache = False
-    trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+
+    # =================================================================
+    # Training Loop with Curriculum Learning Support
+    # =================================================================
+    if use_curriculum:
+        print("\n" + "="*50)
+        print("🎓 Starting Curriculum Learning Training")
+        print(f"Total Epochs: {num_epochs}")
+        print("="*50 + "\n")
+
+        for epoch in range(num_epochs):
+            # 计算当前训练进度
+            progress = epoch / num_epochs
+
+            print(f"\n{'='*50}")
+            print(f"📖 Epoch {epoch + 1}/{num_epochs} (Progress: {progress:.2%})")
+            print(f"{'='*50}\n")
+
+            # 动态构建当前 epoch 的数据集
+            mixed_ds = build_curriculum_dataset(explain_ds, reasoning_ds, topology_ds, progress)
+            current_train_data = mixed_ds.shuffle().map(generate_and_tokenize_prompt)
+
+            # 更新 trainer 的训练数据集
+            trainer.train_dataset = current_train_data
+
+            # 训练当前 epoch
+            if epoch == 0:
+                # 第一个 epoch，可能需要从 checkpoint 恢复
+                trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+            else:
+                # 后续 epoch，从上一个 epoch 的结果继续
+                trainer.train(resume_from_checkpoint=True)
+
+            print(f"\n✅ Epoch {epoch + 1}/{num_epochs} completed!\n")
+
+        print("\n" + "="*50)
+        print("🎉 Curriculum Learning Training Completed!")
+        print("="*50 + "\n")
+    else:
+        # 标准训练（不使用 curriculum learning）
+        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+
     model.save_pretrained(output_dir)
 
 if __name__ == "__main__":
