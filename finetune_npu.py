@@ -93,23 +93,24 @@ def train(
     print(f"Finetuning Qwen2.5 on Ascend NPU with Full BF16 Precision...")
 
     world_size = int(os.environ.get("WORLD_SIZE", 1))
-    local_rank = int(os.environ.get("LOCAL_RANK") or 0)
-    device_map = {"": local_rank}
+    local_rank = int(os.environ.get("LOCAL_RANK", "0"))  # 获取当前进程的卡号
+    device_map = {"": local_rank}  # 显式指定该进程只使用对应的这块卡
 
     # 清理 NPU 缓存，确保有足够内存加载模型
     torch.npu.empty_cache()
 
-    print(f"Loading model on NPU {local_rank}...")
+    print(f"Process rank {local_rank}/{world_size}: Loading model to NPU {local_rank}...")
 
-    # ### 修改点 3: 使用 bfloat16 节省显存，同时使用 low_cpu_mem_usage 避免 PEFT 兼容性问题
+    # 直接加载到指定的 NPU 设备
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
         torch_dtype=torch.bfloat16,
         device_map=device_map,
         trust_remote_code=True,
-        attn_implementation="eager",
-        low_cpu_mem_usage=True  # 使用低内存加载模式，保持 Parameter 类型
+        attn_implementation="eager"
     )
+
+    print(f"Process rank {local_rank}: Model loaded successfully on NPU {local_rank}")
 
     tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.eos_token
