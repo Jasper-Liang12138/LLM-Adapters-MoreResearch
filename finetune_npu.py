@@ -91,10 +91,15 @@ def train(
         curriculum_seed: int = 42,  # 数据混合的随机种子
 ):
     print(f"Finetuning Qwen2.5 on Ascend NPU with Full BF16 Precision...")
-    
+
     world_size = int(os.environ.get("WORLD_SIZE", 1))
     local_rank = int(os.environ.get("LOCAL_RANK") or 0)
     device_map = {"": local_rank}
+
+    # 清理 NPU 缓存，确保有足够内存加载模型
+    torch.npu.empty_cache()
+
+    print(f"Loading model on NPU {local_rank}...")
 
     # ### 修改点 3: 使用 bfloat16 节省显存，同时使用 low_cpu_mem_usage 避免 PEFT 兼容性问题
     model = AutoModelForCausalLM.from_pretrained(
