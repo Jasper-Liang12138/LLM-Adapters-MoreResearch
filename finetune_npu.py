@@ -166,17 +166,30 @@ def train(
     def build_curriculum_dataset(explain_ds, reasoning_ds, topology_ds, progress):
         """
         根据训练进度动态构建混合数据集
+        注意：输入的数据集应该已经 tokenized
         """
         probs = get_curriculum_probs(progress)
         print(f"📚 Curriculum Progress: {progress:.2%} | Sampling Probs: Explain={probs[0]:.2f}, Reasoning={probs[1]:.2f}, Topology={probs[2]:.2f}")
 
         # 使用 interleave_datasets 按概率混合数据
+        # 注意：这会返回 IterableDataset，但因为数据已经 tokenized，所以很快
         mixed_ds = interleave_datasets(
             [explain_ds, reasoning_ds, topology_ds],
             probabilities=probs,
             seed=curriculum_seed,
             stopping_strategy="all_exhausted"
         )
+
+        # 转换为普通 Dataset 以支持 shuffle 和更好的性能
+        # 注意：这一步会将流式数据集转换为内存数据集
+        print(f"🔄 Building curriculum dataset...")
+        mixed_ds_list = list(mixed_ds)  # 转换为列表
+        from datasets import Dataset
+        mixed_ds = Dataset.from_dict({
+            k: [d[k] for d in mixed_ds_list]
+            for k in mixed_ds_list[0].keys()
+        })
+        print(f"✅ Curriculum dataset built: {len(mixed_ds)} samples")
 
         return mixed_ds
 
@@ -298,6 +311,14 @@ def train(
             print(f"   - Reasoning: {len(reasoning_ds)} samples")
             print(f"   - Topology: {len(topology_ds)} samples")
             print(f"   - Total: {len(full_ds)} samples\n")
+
+            # 关键优化：先 tokenize 各个子数据集，再 interleave
+            # 这样可以显示进度条，而且只需要 tokenize 一次
+            print(f"🔄 Pre-tokenizing datasets (this will be done once)...")
+            explain_ds = explain_ds.map(generate_and_tokenize_prompt, batched=False, num_proc=1, desc="Tokenizing Explain")
+            reasoning_ds = reasoning_ds.map(generate_and_tokenize_prompt, batched=False, num_proc=1, desc="Tokenizing Reasoning")
+            topology_ds = topology_ds.map(generate_and_tokenize_prompt, batched=False, num_proc=1, desc="Tokenizing Topology")
+            print(f"✅ Pre-tokenization complete!\n")
     else:
         # 非 curriculum 模式：直接处理数据
         print(f"🔄 Tokenizing dataset (this may take a moment)...")
@@ -316,16 +337,8 @@ def train(
         # Curriculum learning: 先用第一个 epoch 的数据（progress=0）
         initial_progress = 0.0
         initial_mixed_ds = build_curriculum_dataset(explain_ds, reasoning_ds, topology_ds, initial_progress)
-
-        # 优化：使用批处理和单进程映射，避免卡住
-        print(f"🔄 Tokenizing dataset (this may take a moment)...")
-        initial_train_data = initial_mixed_ds.shuffle().map(
-            generate_and_tokenize_prompt,
-            batched=False,
-            num_proc=1,  # 单进程避免死锁
-            desc="Tokenizing"
-        )
-        print(f"✅ Tokenization complete! Ready to train.")
+        # 数据已经 tokenized，只需要 shuffle
+        initial_train_data = initial_mixed_ds.shuffle()
     else:
         print(f"🔄 Tokenizing dataset (this may take a moment)...")
         initial_train_data = train_data.map(
@@ -432,16 +445,8 @@ def train(
 
             # 动态构建当前 epoch 的数据集
             mixed_ds = build_curriculum_dataset(explain_ds, reasoning_ds, topology_ds, progress)
-
-            # 优化：使用单进程映射避免卡住
-            print(f"🔄 Tokenizing epoch {epoch + 1} dataset...")
-            current_train_data = mixed_ds.shuffle().map(
-                generate_and_tokenize_prompt,
-                batched=False,
-                num_proc=1,
-                desc=f"Tokenizing Epoch {epoch + 1}"
-            )
-            print(f"✅ Epoch {epoch + 1} dataset ready!")
+            # 数据已经 tokenized，只需要 shuffle
+            current_train_data = mixed_ds.shuffle()
 
             # 更新 trainer 的训练数据集
             trainer.train_dataset = current_train_data
