@@ -496,8 +496,10 @@ def train(
                 # 第一个 epoch，可能需要从 checkpoint 恢复
                 trainer.train(resume_from_checkpoint=resume_from_checkpoint)
             else:
-                # 后续 epoch，从上一个 epoch 的结果继续
-                trainer.train(resume_from_checkpoint=True)
+                # 后续 epoch：不从 checkpoint 恢复，直接继续训练
+                # 模型已经在内存中并且已训练，不需要重新加载
+                # 注意：传入 None 而不是 True，避免尝试加载 checkpoint
+                trainer.train(resume_from_checkpoint=None)
 
             print(f"\n✅ Epoch {epoch + 1}/{num_epochs} completed!\n")
 
