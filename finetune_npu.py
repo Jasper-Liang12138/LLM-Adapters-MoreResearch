@@ -4,8 +4,8 @@ import sys
 # ### 修改点 1: 在导入 torch 之前设置环境变量
 # 强制 NPU 保持原图数据类型，禁止私自转 FP16，这是解决溢出的关键
 os.environ["ACL_PRECISION_MODE"] = "must_keep_origin_dtype"
-# 优化显存分配，防止碎片化
-os.environ["PYTORCH_NPU_ALLOC_CONF"] = "max_split_size_mb:128"
+# 优化显存分配，防止碎片化 - 使用更大的块大小减少碎片
+os.environ["PYTORCH_NPU_ALLOC_CONF"] = "max_split_size_mb:512"
 # 禁止某些可能导致 Inner Error 的融合算子
 os.environ["LCCL_DETERMINISTIC"] = "1"
 os.environ["HCC_DETERMINISTIC"] = "1"
@@ -20,6 +20,7 @@ import fire
 import torch
 import torch_npu  # 核心：昇腾必需
 from torch_npu.contrib import transfer_to_npu
+import time  # 用于进程间延迟加载
 
 # ### 修改点 2: NPU 设置
 # 关闭 JIT 编译（Qwen2.5 在 NPU 上 JIT 有时会不稳定）
@@ -87,8 +88,10 @@ def train(
         grpo_max_experiences: int = 50,
         grpo_data_limit: int = -1,
         # === Curriculum Learning 参数 ===
-        use_curriculum: bool = False,  # 是否启用课程学习
+        use_curriculum: bool = True,  # 是否启用课程学习
         curriculum_seed: int = 42,  # 数据混合的随机种子
+        # === 内存优化参数 ===
+        use_gradient_checkpointing: bool = True,  # 梯度检查点，节省显存（推荐开启）
 ):
     print(f"Finetuning Qwen2.5 on Ascend NPU with Full BF16 Precision...")
 
@@ -98,17 +101,33 @@ def train(
 
     # 清理 NPU 缓存，确保有足够内存加载模型
     torch.npu.empty_cache()
+    # 强制同步，确保缓存清理完成
+    if torch.npu.is_available():
+        torch.npu.synchronize()
+    
+    # 进程间错开加载时间，避免同时加载导致内存峰值过高
+    if world_size > 1:
+        time.sleep(local_rank * 2)  # 每个进程延迟 2 秒，错开加载
 
     print(f"Process rank {local_rank}/{world_size}: Loading model to NPU {local_rank}...")
 
-    # 直接加载到指定的 NPU 设备
+    # 计算每个设备的最大内存限制（留出一些余量用于训练）
+    # 60.96 GiB 总容量，为训练预留约 5-10 GiB
+    max_memory_per_device = {local_rank: "50GiB"}
+    
+    # 直接加载到指定的 NPU 设备，使用低内存模式
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
         torch_dtype=torch.bfloat16,
         device_map=device_map,
+        max_memory=max_memory_per_device,
+        low_cpu_mem_usage=True,  # 关键：减少 CPU 内存占用，优化加载过程
         trust_remote_code=True,
         attn_implementation="eager"
     )
+    
+    # 加载完成后再次清理缓存
+    torch.npu.empty_cache()
 
     print(f"Process rank {local_rank}: Model loaded successfully on NPU {local_rank}")
 
@@ -226,6 +245,29 @@ def train(
     if adapter_name == "prefix-tuning":
         model.to(f'npu:{local_rank}')
 
+    # --- 启用梯度检查点以节省显存 ---
+    if use_gradient_checkpointing:
+        # 必须在 PEFT 包装后启用，这样 LoRA 层也能受益
+        # NPU 兼容性检查：gradient checkpointing 在 NPU 上通常可用，但需要测试
+        try:
+            if hasattr(model, "gradient_checkpointing_enable"):
+                model.gradient_checkpointing_enable()
+                print(f"✅ Gradient checkpointing enabled (saves ~30-50% memory)")
+                print(f"   Note: If you encounter errors, try --use_gradient_checkpointing False")
+            elif hasattr(model, "gradient_checkpointing"):
+                # 某些模型使用不同的属性名
+                model.gradient_checkpointing = True
+                print(f"✅ Gradient checkpointing enabled via gradient_checkpointing attribute")
+            else:
+                print("⚠️  Warning: Model does not support gradient checkpointing, disabling...")
+                use_gradient_checkpointing = False
+        except Exception as e:
+            print(f"⚠️  Warning: Failed to enable gradient checkpointing on NPU: {e}")
+            print(f"   Disabling gradient checkpointing. If memory issues persist, try reducing batch_size.")
+            use_gradient_checkpointing = False
+    else:
+        print("ℹ️  Gradient checkpointing disabled")
+
     # --- NPU 稳定性补丁：修复 RMSNorm 导致的 Inner Error ---
     from transformers.models.qwen2.modeling_qwen2 import Qwen2RMSNorm
 
@@ -309,6 +351,7 @@ def train(
             bf16=True,      # 必须开启！这会禁用 FP16 GradScaler
             fp16=False,     # 确保关闭 FP16
             optim="adamw_torch",
+            gradient_checkpointing=use_gradient_checkpointing,  # 梯度检查点，节省显存
             # ----------------
 
             dataloader_pin_memory=False,
