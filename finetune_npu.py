@@ -299,7 +299,15 @@ def train(
             print(f"   - Topology: {len(topology_ds)} samples")
             print(f"   - Total: {len(full_ds)} samples\n")
     else:
-        train_data = data["train"].shuffle().map(generate_and_tokenize_prompt)
+        # 非 curriculum 模式：直接处理数据
+        print(f"🔄 Tokenizing dataset (this may take a moment)...")
+        train_data = data["train"].shuffle().map(
+            generate_and_tokenize_prompt,
+            batched=False,
+            num_proc=1,
+            desc="Tokenizing"
+        )
+        print(f"✅ Tokenization complete!")
 
     gradient_accumulation_steps = (batch_size // micro_batch_size) // world_size
 
@@ -308,9 +316,25 @@ def train(
         # Curriculum learning: 先用第一个 epoch 的数据（progress=0）
         initial_progress = 0.0
         initial_mixed_ds = build_curriculum_dataset(explain_ds, reasoning_ds, topology_ds, initial_progress)
-        initial_train_data = initial_mixed_ds.shuffle().map(generate_and_tokenize_prompt)
+
+        # 优化：使用批处理和单进程映射，避免卡住
+        print(f"🔄 Tokenizing dataset (this may take a moment)...")
+        initial_train_data = initial_mixed_ds.shuffle().map(
+            generate_and_tokenize_prompt,
+            batched=False,
+            num_proc=1,  # 单进程避免死锁
+            desc="Tokenizing"
+        )
+        print(f"✅ Tokenization complete! Ready to train.")
     else:
-        initial_train_data = train_data
+        print(f"🔄 Tokenizing dataset (this may take a moment)...")
+        initial_train_data = train_data.map(
+            generate_and_tokenize_prompt,
+            batched=False,
+            num_proc=1,
+            desc="Tokenizing"
+        )
+        print(f"✅ Tokenization complete! Ready to train.")
 
     # ### 修改点 5: 核心修复 - 开启 bf16=True
     # 这会告诉 Trainer 不要使用 GradScaler，因为 BF16 不需要缩放。
@@ -408,7 +432,16 @@ def train(
 
             # 动态构建当前 epoch 的数据集
             mixed_ds = build_curriculum_dataset(explain_ds, reasoning_ds, topology_ds, progress)
-            current_train_data = mixed_ds.shuffle().map(generate_and_tokenize_prompt)
+
+            # 优化：使用单进程映射避免卡住
+            print(f"🔄 Tokenizing epoch {epoch + 1} dataset...")
+            current_train_data = mixed_ds.shuffle().map(
+                generate_and_tokenize_prompt,
+                batched=False,
+                num_proc=1,
+                desc=f"Tokenizing Epoch {epoch + 1}"
+            )
+            print(f"✅ Epoch {epoch + 1} dataset ready!")
 
             # 更新 trainer 的训练数据集
             trainer.train_dataset = current_train_data
