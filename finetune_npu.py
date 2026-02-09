@@ -33,9 +33,8 @@ from tqdm import tqdm
 
 sys.path.append(os.path.join(os.getcwd(), "peft/src/"))
 from peft import (
-    LoraConfig, AdaLoraConfig, QLoRAConfig, BottleneckConfig, PrefixTuningConfig,
-    get_peft_model, get_peft_model_state_dict, set_peft_model_state_dict,
-    prepare_model_for_int8_training, prepare_model_for_kbit_training
+    LoraConfig, AdaLoraConfig, BottleneckConfig, PrefixTuningConfig,
+    get_peft_model, get_peft_model_state_dict, set_peft_model_state_dict
 )
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -60,18 +59,16 @@ def safe_str(value, default=""):
     return str(value)
 
 def train(
-        base_model: str = "", 
+        base_model: str = "",
         data_path: str = "yahma/alpaca-cleaned",
-        output_dir: str = "./lora-qwen", 
+        output_dir: str = "./lora-qwen",
         adapter_name: str = "lora",
-        load_8bit: bool = False,
         batch_size: int = 128,
         micro_batch_size: int = 4,
         num_epochs: int = 3,
         learning_rate: float = 3e-4,
         cutoff_len: int = 1024,
         val_set_size: int = 0,
-        use_gradient_checkpointing: bool = False,
         eval_step: int = 50,
         save_step: int = 200,
         lora_r: int = 8,
@@ -102,7 +99,6 @@ def train(
     # ### 修改点 3: 使用 bfloat16 节省显存，同时使用 low_cpu_mem_usage 避免 PEFT 兼容性问题
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
-        load_in_8bit=load_8bit,
         torch_dtype=torch.bfloat16,
         device_map=device_map,
         trust_remote_code=True,
@@ -163,11 +159,6 @@ def train(
 
         return mixed_ds
 
-    if load_8bit:
-        model = prepare_model_for_int8_training(model, use_gradient_checkpointing=use_gradient_checkpointing)
-    elif adapter_name == "qlora":
-        model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=use_gradient_checkpointing)
-    
     target_modules = safe_list(target_modules, ["q_proj", "k_proj", "v_proj", "o_proj"])
 
     # ### 修改点: NPU BFloat16 兼容性修复
@@ -206,14 +197,6 @@ def train(
             tinit=200,
             tfinal=1000,
             deltaT=10,
-        )
-    elif adapter_name == "qlora":
-        config = QLoRAConfig(
-            r=lora_r,
-            lora_alpha=lora_alpha,
-            target_modules=target_modules,
-            lora_dropout=lora_dropout,
-            task_type="CAUSAL_LM",
         )
     elif adapter_name == "bottleneck":
         config = BottleneckConfig(
