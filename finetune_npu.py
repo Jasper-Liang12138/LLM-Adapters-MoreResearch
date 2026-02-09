@@ -4,9 +4,6 @@ import sys
 # ### 修改点 1: 在导入 torch 之前设置环境变量
 # 强制 NPU 保持原图数据类型，禁止私自转 FP16，这是解决溢出的关键
 os.environ["ACL_PRECISION_MODE"] = "must_keep_origin_dtype"
-# 优化显存分配，防止碎片化 - 使用更大的块大小减少碎片
-# 对于 7B 模型，使用更大的块可以减少碎片，但需要平衡
-os.environ["PYTORCH_NPU_ALLOC_CONF"] = "max_split_size_mb:1024"
 # 禁止某些可能导致 Inner Error 的融合算子
 os.environ["LCCL_DETERMINISTIC"] = "1"
 os.environ["HCC_DETERMINISTIC"] = "1"
@@ -115,8 +112,9 @@ def train(
 
     # 计算每个设备的最大内存限制（留出更多余量用于训练和避免碎片）
     # 60.96 GiB 总容量，7B 模型约需要 14-15 GiB，为训练和碎片预留更多空间
-    # 降低限制可以强制更早释放内存，减少碎片
-    max_memory_per_device = {local_rank: "45GiB"}
+    # 进一步降低限制，强制更早释放内存，减少碎片
+    # 注意：这个限制主要用于加载阶段，训练时会动态调整
+    max_memory_per_device = {local_rank: "40GiB"}
     
     # 直接加载到指定的 NPU 设备，使用低内存模式
     model = AutoModelForCausalLM.from_pretrained(
@@ -129,9 +127,17 @@ def train(
         attn_implementation="eager"
     )
     
-    # 加载完成后再次清理缓存
+    # 加载完成后立即清理缓存，释放碎片内存
     torch.npu.empty_cache()
-
+    if torch.npu.is_available():
+        torch.npu.synchronize()
+    
+    # 等待所有进程完成模型加载，避免内存竞争
+    if world_size > 1:
+        import torch.distributed as dist
+        if dist.is_initialized():
+            dist.barrier()  # 同步点：等待所有进程完成加载
+    
     print(f"Process rank {local_rank}: Model loaded successfully on NPU {local_rank}")
 
     tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
@@ -243,8 +249,16 @@ def train(
             num_virtual_tokens=num_virtual_tokens,
             task_type="CAUSAL_LM",
         )
-        
+    
+    # PEFT 包装前清理缓存，确保有足够内存创建 LoRA 层
+    torch.npu.empty_cache()
+    if torch.npu.is_available():
+        torch.npu.synchronize()
+    
     model = get_peft_model(model, config)
+    
+    # PEFT 包装后再次清理缓存
+    torch.npu.empty_cache()
     if adapter_name == "prefix-tuning":
         model.to(f'npu:{local_rank}')
 
