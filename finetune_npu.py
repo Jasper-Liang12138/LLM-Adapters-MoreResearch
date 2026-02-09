@@ -119,13 +119,7 @@ def train(
         attn_implementation="eager"
     )
 
-    # 手动将模型移动到指定设备
-    model = model.to(device)
-
-    # 清理缓存
-    torch.npu.empty_cache()
-
-    print(f"Process rank {local_rank}: Model loaded successfully on {device}")
+    print(f"Process rank {local_rank}: Model loaded successfully on CPU, moving to {device}...")
 
     tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.eos_token
@@ -257,11 +251,24 @@ def train(
 
     model = get_peft_model(model, config)
 
-    # PEFT 包装后清理缓存
+    # 关键：先应用 PEFT，再移动到设备
+    # 这样可以确保 LoRA 参数正确初始化并启用梯度
+    print(f"Process rank {local_rank}: Moving PEFT model to {device}...")
+    model = model.to(device)
+
+    # 清理缓存
     torch.npu.empty_cache()
-    # prefix-tuning 需要确保在正确的设备上（其他适配器已经在正确设备）
-    if adapter_name == "prefix-tuning":
-        model = model.to(device)
+
+    # 确保模型在训练模式
+    model.train()
+
+    # 显式确保 LoRA 参数启用梯度
+    for param in model.parameters():
+        if param.requires_grad:
+            # 确保梯度已启用的参数保持启用状态
+            param.requires_grad = True
+
+    print(f"Process rank {local_rank}: PEFT model ready on {device}")
 
     # --- 启用梯度检查点以节省显存 ---
     if use_gradient_checkpointing:
