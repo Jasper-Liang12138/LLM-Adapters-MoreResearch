@@ -183,18 +183,32 @@ def train(
 
         print(f"🔄 Building curriculum dataset: {n_explain} explain + {n_reasoning} reasoning + {n_topology} topology = {n_explain + n_reasoning + n_topology} samples")
 
-        # 从每个数据集中随机采样
+        # 从每个数据集中随机采样（允许重复采样以达到目标数量）
         random.seed(curriculum_seed + int(progress * 1000))  # 每个 epoch 不同的种子
 
         sampled_datasets = []
         if n_explain > 0:
-            indices = random.sample(range(len(explain_ds)), min(n_explain, len(explain_ds)))
+            # 如果需要的样本数超过数据集大小，允许重复采样
+            if n_explain <= len(explain_ds):
+                indices = random.sample(range(len(explain_ds)), n_explain)
+            else:
+                # 重复采样：先全部取，然后随机补充
+                indices = list(range(len(explain_ds)))
+                indices += random.choices(range(len(explain_ds)), k=n_explain - len(explain_ds))
             sampled_datasets.append(explain_ds.select(indices))
         if n_reasoning > 0:
-            indices = random.sample(range(len(reasoning_ds)), min(n_reasoning, len(reasoning_ds)))
+            if n_reasoning <= len(reasoning_ds):
+                indices = random.sample(range(len(reasoning_ds)), n_reasoning)
+            else:
+                indices = list(range(len(reasoning_ds)))
+                indices += random.choices(range(len(reasoning_ds)), k=n_reasoning - len(reasoning_ds))
             sampled_datasets.append(reasoning_ds.select(indices))
         if n_topology > 0:
-            indices = random.sample(range(len(topology_ds)), min(n_topology, len(topology_ds)))
+            if n_topology <= len(topology_ds):
+                indices = random.sample(range(len(topology_ds)), n_topology)
+            else:
+                indices = list(range(len(topology_ds)))
+                indices += random.choices(range(len(topology_ds)), k=n_topology - len(topology_ds))
             sampled_datasets.append(topology_ds.select(indices))
 
         # 合并所有采样的数据集
@@ -271,6 +285,8 @@ def train(
     print(f"Process rank {local_rank}: PEFT model ready on {device}")
 
     # --- 启用梯度检查点以节省显存 ---
+    # 注意：在 NPU 上，梯度检查点可能与 PEFT 不兼容，暂时禁用
+    use_gradient_checkpointing = False  # 强制禁用，避免梯度问题
     if use_gradient_checkpointing:
         # 必须在 PEFT 包装后启用，这样 LoRA 层也能受益
         # NPU 兼容性检查：gradient checkpointing 在 NPU 上通常可用，但需要测试
@@ -291,7 +307,7 @@ def train(
             print(f"   Disabling gradient checkpointing. If memory issues persist, try reducing batch_size.")
             use_gradient_checkpointing = False
     else:
-        print("ℹ️  Gradient checkpointing disabled")
+        print("ℹ️  Gradient checkpointing disabled (recommended for NPU + PEFT compatibility)")
 
     # 打印可训练参数，确认 LoRA 挂载正确
     model.print_trainable_parameters()
