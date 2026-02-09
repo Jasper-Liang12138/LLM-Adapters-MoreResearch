@@ -316,6 +316,37 @@ def train(
     # 这会告诉 Trainer 不要使用 GradScaler，因为 BF16 不需要缩放。
     # 彻底解决 "Loss scaler reducing loss scale to 0.0" 问题
 
+    # 自定义回调：打印训练进度和指标
+    class ProgressCallback(transformers.TrainerCallback):
+        def on_log(self, _args, state, _control, logs=None, **_kwargs):
+            """每次日志记录时调用"""
+            if logs and state.is_local_process_zero:
+                # 只在主进程打印
+                step = state.global_step
+                epoch = state.epoch if state.epoch is not None else 0
+
+                # 构建日志信息
+                log_str = f"[Step {step} | Epoch {epoch:.2f}]"
+
+                if "loss" in logs:
+                    log_str += f" Loss: {logs['loss']:.4f}"
+                if "learning_rate" in logs:
+                    log_str += f" | LR: {logs['learning_rate']:.2e}"
+                if "grad_norm" in logs:
+                    log_str += f" | Grad Norm: {logs['grad_norm']:.4f}"
+
+                # 打印到控制台
+                if "loss" in logs:  # 只在有 loss 时打印，避免重复
+                    print(log_str)
+
+        def on_epoch_end(self, _args, state, _control, **_kwargs):
+            """每个 epoch 结束时调用"""
+            if state.is_local_process_zero:
+                print(f"\n{'='*60}")
+                print(f"✅ Epoch {int(state.epoch)} completed!")
+                print(f"   Total steps: {state.global_step}")
+                print(f"{'='*60}\n")
+
     trainer = transformers.Trainer(
         model=model,
         train_dataset=initial_train_data,
@@ -333,8 +364,14 @@ def train(
             gradient_checkpointing=use_gradient_checkpointing,  # 梯度检查点，节省显存
             # ----------------
 
-            dataloader_pin_memory=False,
+            # --- 日志和进度显示配置 ---
+            logging_strategy="steps",
             logging_steps=10,
+            logging_first_step=True,  # 显示第一步的指标
+            disable_tqdm=False,  # 启用进度条
+            # ----------------
+
+            dataloader_pin_memory=False,
             save_strategy="steps",
             save_steps=save_step,
             output_dir=output_dir,
@@ -343,6 +380,7 @@ def train(
 
         ),
         data_collator=transformers.DataCollatorForSeq2Seq(tokenizer, pad_to_multiple_of=8, padding=True),
+        callbacks=[ProgressCallback()],  # 添加自定义回调
     )
 
     # 禁用 KV cache（训练时不需要）
