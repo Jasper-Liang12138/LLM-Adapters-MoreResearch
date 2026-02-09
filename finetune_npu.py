@@ -99,15 +99,15 @@ def train(
     local_rank = int(os.environ.get("LOCAL_RANK") or 0)
     device_map = {"": local_rank}
 
-    # ### 修改点 3: 不在加载时指定 dtype，让 PEFT 先包装模型
-    # 然后由 Trainer 的 bf16=True 来处理精度转换
+    # ### 修改点 3: 使用 bfloat16 节省显存，同时使用 low_cpu_mem_usage 避免 PEFT 兼容性问题
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
         load_in_8bit=load_8bit,
-        # torch_dtype=torch.bfloat16,  # 注释掉，避免 NPU 上的 BFloat16Tensor 问题
+        torch_dtype=torch.bfloat16,
         device_map=device_map,
         trust_remote_code=True,
-        attn_implementation="eager" 
+        attn_implementation="eager",
+        low_cpu_mem_usage=True  # 使用低内存加载模式，保持 Parameter 类型
     )
 
     tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
@@ -169,7 +169,19 @@ def train(
         model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=use_gradient_checkpointing)
     
     target_modules = safe_list(target_modules, ["q_proj", "k_proj", "v_proj", "o_proj"])
-    
+
+    # ### 修改点: NPU BFloat16 兼容性修复
+    # 确保所有参数都是 torch.nn.Parameter 类型，而不是原始 tensor
+    # 这解决了 NPU 上 BFloat16Tensor 导致的 PEFT 包装失败问题
+    for name, param in model.named_parameters():
+        if not isinstance(param, torch.nn.Parameter):
+            # 将原始 tensor 转换为 Parameter
+            parent_module = model
+            name_parts = name.split('.')
+            for part in name_parts[:-1]:
+                parent_module = getattr(parent_module, part)
+            setattr(parent_module, name_parts[-1], torch.nn.Parameter(param.data))
+
     if adapter_name == "lora":
         config = LoraConfig(
             r=lora_r,
