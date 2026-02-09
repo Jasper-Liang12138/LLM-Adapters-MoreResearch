@@ -222,8 +222,7 @@ def train(
         
     model = get_peft_model(model, config)
     if adapter_name == "prefix-tuning":
-        model.to('cuda')
-    model = get_peft_model(model, config)
+        model.to(f'npu:{local_rank}')
 
     # --- NPU 稳定性补丁：修复 RMSNorm 导致的 Inner Error ---
     from transformers.models.qwen2.modeling_qwen2 import Qwen2RMSNorm
@@ -262,9 +261,9 @@ def train(
             train_data = full_ds.shuffle().map(generate_and_tokenize_prompt)
         else:
             # 按难度过滤数据集
-            explain_ds = full_ds.filter(lambda x: x.get("difficulty") == "basic")
+            explain_ds = full_ds.filter(lambda x: x.get("difficulty") == "explain")
             reasoning_ds = full_ds.filter(lambda x: x.get("difficulty") == "reasoning")
-            topology_ds = full_ds.filter(lambda x: x.get("difficulty") not in ["basic", "reasoning"])
+            topology_ds = full_ds.filter(lambda x: x.get("difficulty") == "topology")
 
             # 如果没有 topology 数据，使用 reasoning 的一部分
             if len(topology_ds) == 0:
@@ -272,9 +271,9 @@ def train(
                 topology_ds = reasoning_ds
 
             print(f"✅ Dataset split by difficulty:")
-            print(f"   - Explain (basic): {len(explain_ds)} samples")
+            print(f"   - Explain: {len(explain_ds)} samples")
             print(f"   - Reasoning: {len(reasoning_ds)} samples")
-            print(f"   - Topology (advanced): {len(topology_ds)} samples")
+            print(f"   - Topology: {len(topology_ds)} samples")
             print(f"   - Total: {len(full_ds)} samples\n")
     else:
         train_data = data["train"].shuffle().map(generate_and_tokenize_prompt)
