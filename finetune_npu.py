@@ -27,7 +27,7 @@ torch_npu.npu.set_compile_mode(jit_compile=False)
 torch.npu.set_option({"ACL_PRECISION_MODE": "must_keep_origin_dtype"})
 
 import transformers
-from datasets import load_dataset, Dataset, interleave_datasets
+from datasets import load_dataset, concatenate_datasets
 from tqdm import tqdm
 
 sys.path.append(os.path.join(os.getcwd(), "peft/src/"))
@@ -167,28 +167,45 @@ def train(
         """
         根据训练进度动态构建混合数据集
         注意：输入的数据集应该已经 tokenized
+        使用简单的采样策略，避免 interleave_datasets 的复杂性
         """
+        import random
+
         probs = get_curriculum_probs(progress)
         print(f"📚 Curriculum Progress: {progress:.2%} | Sampling Probs: Explain={probs[0]:.2f}, Reasoning={probs[1]:.2f}, Topology={probs[2]:.2f}")
 
-        # 使用 interleave_datasets 按概率混合数据
-        # 注意：这会返回 IterableDataset，但因为数据已经 tokenized，所以很快
-        mixed_ds = interleave_datasets(
-            [explain_ds, reasoning_ds, topology_ds],
-            probabilities=probs,
-            seed=curriculum_seed,
-            stopping_strategy="all_exhausted"
-        )
+        # 简单策略：按概率计算每个数据集应该取多少样本
+        total_samples = len(explain_ds) + len(reasoning_ds) + len(topology_ds)
 
-        # 转换为普通 Dataset 以支持 shuffle 和更好的性能
-        # 注意：这一步会将流式数据集转换为内存数据集
-        print(f"🔄 Building curriculum dataset...")
-        mixed_ds_list = list(mixed_ds)  # 转换为列表
-        from datasets import Dataset
-        mixed_ds = Dataset.from_dict({
-            k: [d[k] for d in mixed_ds_list]
-            for k in mixed_ds_list[0].keys()
-        })
+        # 计算每个数据集的目标样本数
+        n_explain = int(total_samples * probs[0])
+        n_reasoning = int(total_samples * probs[1])
+        n_topology = int(total_samples * probs[2])
+
+        # 确保总数正确（处理舍入误差）
+        diff = total_samples - (n_explain + n_reasoning + n_topology)
+        if diff > 0:
+            n_explain += diff
+
+        print(f"🔄 Building curriculum dataset: {n_explain} explain + {n_reasoning} reasoning + {n_topology} topology = {n_explain + n_reasoning + n_topology} samples")
+
+        # 从每个数据集中随机采样
+        random.seed(curriculum_seed + int(progress * 1000))  # 每个 epoch 不同的种子
+
+        sampled_datasets = []
+        if n_explain > 0:
+            indices = random.sample(range(len(explain_ds)), min(n_explain, len(explain_ds)))
+            sampled_datasets.append(explain_ds.select(indices))
+        if n_reasoning > 0:
+            indices = random.sample(range(len(reasoning_ds)), min(n_reasoning, len(reasoning_ds)))
+            sampled_datasets.append(reasoning_ds.select(indices))
+        if n_topology > 0:
+            indices = random.sample(range(len(topology_ds)), min(n_topology, len(topology_ds)))
+            sampled_datasets.append(topology_ds.select(indices))
+
+        # 合并所有采样的数据集
+        mixed_ds = concatenate_datasets(sampled_datasets)
+
         print(f"✅ Curriculum dataset built: {len(mixed_ds)} samples")
 
         return mixed_ds
