@@ -189,7 +189,8 @@ def train(
         generate_and_tokenize_prompt,
         batched=False,
         num_proc=4,
-        desc="Tokenizing"
+        desc="Tokenizing",
+        remove_columns=data["train"].column_names,
     )
     if rank == 0:
         print(f"✅ Tokenization complete! Total samples: {len(train_data)}")
