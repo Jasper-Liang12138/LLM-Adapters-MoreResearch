@@ -120,6 +120,13 @@ def train(
 
     print(f"✅ Model loaded on rank {rank}")
 
+    # 将所有 registered buffer（如 rotary_emb 的 inv_freq）移到当前 NPU
+    # ZeRO-3 offload_optimizer 不会自动处理 buffer，需要手动移
+    current_device = torch.device(f"npu:{local_rank}")
+    for name, buf in model.named_buffers():
+        if buf is not None and buf.device.type == "cpu":
+            buf.data = buf.data.to(current_device)
+
     # Tokenizer
     tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True, local_files_only=True)
     tokenizer.pad_token = tokenizer.eos_token
