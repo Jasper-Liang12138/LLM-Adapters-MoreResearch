@@ -1,3 +1,10 @@
+import sys
+try:
+    import lzma
+except ModuleNotFoundError:
+    from backports import lzma
+    sys.modules["lzma"] = lzma
+
 import os
 import sys
 

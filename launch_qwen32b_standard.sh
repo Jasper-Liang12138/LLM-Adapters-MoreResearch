@@ -70,9 +70,10 @@ LORA_DROPOUT=0.05
 # DeepSpeed 配置文件（ZeRO-2 优化）
 DS_CONFIG="./ds_config_zero2.json"
 
-# 直接运行训练脚本（DeepSpeed 会读取环境变量）
-"${PYTHON_BIN}" -m torch.distributed.launch \
-    --use_env \
+# 直接运行训练脚本
+"${PYTHON_BIN}" -m torchrun \
+    --nproc_per_node=8 \
+    --master_port=29500 \
     finetune_npu_deepspeed_standard.py \
     --base_model "$BASE_MODEL" \
     --data_path "$DATA_PATH" \
