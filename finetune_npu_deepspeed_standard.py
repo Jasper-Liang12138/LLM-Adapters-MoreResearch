@@ -166,11 +166,24 @@ def train(
     # 使用 deepspeed.zero.Init 上下文加载模型
     # 这使参数直接以分片形式存在于 CPU，offload_param 才真正生效
     # remote_device="cpu" 确保初始化时参数在 CPU 而非 meta/NPU
+    # deepspeed.zero.Init 不支持 "auto"，需要传入具体数值
     import deepspeed
+    _zero_init_cfg = {
+        "train_batch_size": batch_size,
+        "train_micro_batch_size_per_gpu": micro_batch_size,
+        "gradient_accumulation_steps": gradient_accumulation_steps,
+        "zero_optimization": {
+            "stage": 3,
+            "offload_param": {
+                "device": "cpu",
+                "pin_memory": True,
+            },
+        },
+    }
     with deepspeed.zero.Init(
         remote_device="cpu",
         pin_memory=True,
-        config_dict_or_path=ds_config_dict,
+        config_dict_or_path=_zero_init_cfg,
         dtype=torch.bfloat16,
     ):
         model = AutoModelForCausalLM.from_pretrained(
