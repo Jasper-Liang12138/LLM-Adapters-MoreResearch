@@ -9,6 +9,21 @@
 # 适用于平台自动配置环境变量的场景
 # ============================================
 
+# ---------- Python 环境配置 ----------
+# 优先使用系统 Python（已安装 torch-npu），如需切换请修改此处
+# 可通过环境变量覆盖：PYTHON_BIN=/path/to/python bash launch_qwen32b_standard.sh
+PYTHON_BIN="${PYTHON_BIN:-python}"
+
+# 验证 torch 可用性
+if ! "${PYTHON_BIN}" -c "import torch" 2>/dev/null; then
+    echo "[ERROR] ${PYTHON_BIN} 无法导入 torch，请检查 Python 环境"
+    echo "[HINT]  当前 python 路径: $(which python)"
+    echo "[HINT]  尝试: PYTHON_BIN=/path/to/correct/python bash launch_qwen32b_standard.sh"
+    exit 1
+fi
+echo "[INFO] Python 路径: $(${PYTHON_BIN} -c 'import sys; print(sys.executable)')"
+echo "[INFO] torch 版本: $(${PYTHON_BIN} -c 'import torch; print(torch.__version__)')"
+
 # ---------- 路径配置（按需修改）----------
 MODEL_PATH="${MODEL_PATH:-/mnt/nvme0/models/Qwen2.5-32B-Instruct}"
 BASE_MODEL="$MODEL_PATH"
@@ -56,7 +71,7 @@ LORA_DROPOUT=0.05
 DS_CONFIG="./ds_config_zero2.json"
 
 # 直接运行训练脚本（DeepSpeed 会读取环境变量）
-python -m torch.distributed.launch \
+"${PYTHON_BIN}" -m torch.distributed.launch \
     --use_env \
     finetune_npu_deepspeed_standard.py \
     --base_model "$BASE_MODEL" \
@@ -81,7 +96,7 @@ python -m torch.distributed.launch \
 #
 # 1. 在天翼云训推服务网页界面:
 #    - 选择训练任务类型: 分布式训练
-#    - 节点数: 2
+#    - 节点数: 1
 #    - 每节点 NPU 数: 8
 #    - 启动脚本: bash launch_qwen32b_standard.sh
 #
