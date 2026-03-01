@@ -59,14 +59,5 @@
 
   "steps_per_print": 10,
   "wall_clock_breakdown": false,
-  "dump_state": false,
-
-  "activation_checkpointing": {
-    "partition_activations": true,
-    "cpu_checkpointing": false,
-    "contiguous_memory_optimization": false,
-    "number_checkpoints": null,
-    "synchronize_checkpoint_boundary": false,
-    "profile": false
-  }
+  "dump_state": false
 }
