@@ -184,6 +184,11 @@ def train(
     model = get_peft_model(model, config)
     model.print_trainable_parameters()
 
+    # 启用 DeepSpeed activation checkpointing（节省激活值显存，避免 NPU OOM）
+    import deepspeed
+    deepspeed.checkpointing.configure(None, partition_activations=True)
+    model.enable_input_require_grads()
+
     # 加载数据集
     if rank == 0:
         print(f"📚 Loading dataset from {data_path}")
