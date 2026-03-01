@@ -2,7 +2,7 @@
 # CTyunOS 22.06.2 训练脚本 - Qwen2.5-32B-Instruct + 8张华为昇腾910B
 # 系统：CTyunOS 22.06.2@ascend-910b 64位
 # 硬件：8*HuaweiAscend 910B
-# 使用 DeepSpeed ZeRO-2 优化
+# 使用 DeepSpeed ZeRO-3 优化（32B模型单卡显存不足，必须使用ZeRO-3分片参数）
 
 # ============================================
 # 天翼云训推服务 - Qwen-32B 标准微调（无课程学习）
@@ -75,8 +75,8 @@ LORA_R=32
 LORA_ALPHA=64
 LORA_DROPOUT=0.05
 
-# DeepSpeed 配置文件（ZeRO-2 优化）
-DS_CONFIG="./ds_config_zero2.json"
+# DeepSpeed 配置文件（ZeRO-3，32B模型必须分片参数到所有卡）
+DS_CONFIG="./ds_config_zero3.json"
 
 # 直接运行训练脚本
 /root/PERL-FORK/venv_perl/bin/torchrun \
