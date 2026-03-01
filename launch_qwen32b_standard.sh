@@ -33,6 +33,11 @@ LOG_FILE=${OUTPUT_DIR}/output.log
 
 mkdir -p "${OUTPUT_DIR}"
 
+# 激活 GCC 10（CPUAdam 编译需要 GCC 9+）
+export PATH="/opt/ctyunos/gcc-toolset-10/root/usr/bin:$PATH"
+export LD_LIBRARY_PATH="/opt/ctyunos/gcc-toolset-10/root/usr/lib64:$LD_LIBRARY_PATH"
+echo "[INFO] GCC 版本: $(gcc --version | head -1)"
+
 # 设置NPU环境变量（CTyunOS专用）
 # source CANN 环境，确保 TBE/ACL 组件正确加载
 if [ -f /usr/local/Ascend/ascend-toolkit/set_env.sh ]; then
