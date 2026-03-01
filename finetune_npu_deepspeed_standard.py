@@ -20,12 +20,24 @@ import json
 import fire
 import torch
 import torch_npu
-from torch_npu.contrib import transfer_to_npu
+# 注意：不导入 transfer_to_npu，避免其劫持 .to() 方法干扰 DeepSpeed ZeRO-3 分片
+# from torch_npu.contrib import transfer_to_npu
 import time
 
 # NPU 设置
 torch_npu.npu.set_compile_mode(jit_compile=False)
 torch.npu.set_option({"ACL_PRECISION_MODE": "must_keep_origin_dtype"})
+
+# 手动设置 hccl 后端（原本由 transfer_to_npu 完成）
+import torch.distributed
+_original_init_process_group = torch.distributed.init_process_group
+def _patched_init_process_group(*args, **kwargs):
+    if "backend" not in kwargs and (not args or args[0] not in ("hccl", "nccl", "gloo", "mpi")):
+        kwargs["backend"] = "hccl"
+    elif args and args[0] == "nccl":
+        args = ("hccl",) + args[1:]
+    return _original_init_process_group(*args, **kwargs)
+torch.distributed.init_process_group = _patched_init_process_group
 
 import transformers
 from datasets import load_dataset
@@ -93,23 +105,17 @@ def train(
 
     print(f"💾 Loading model: {base_model}")
 
-    # 使用 deepspeed.zero.Init 上下文在 ZeRO-3 模式下初始化模型
-    # 这样每个 rank 只持有模型参数的 1/world_size 分片，避免 OOM
-    import deepspeed
-    ds_init_config = {
-        "train_micro_batch_size_per_gpu": micro_batch_size,
-        "zero_optimization": {"stage": 3}
-    }
-    with deepspeed.zero.Init(config_dict_or_path=ds_init_config,
-                             mem_efficient_linear=False,
-                             remote_device=None):
-        model = AutoModelForCausalLM.from_pretrained(
-            base_model,
-            torch_dtype=torch.bfloat16,
-            trust_remote_code=True,
-            attn_implementation="eager",
-            use_cache=False,
-        )
+    # torch_npu 与 deepspeed.zero.Init 不兼容（meta tensor 问题）
+    # 改用 low_cpu_mem_usage=True：逐层加载到 CPU，显著减少峰值内存
+    # DeepSpeed ZeRO-3 会在 Trainer.prepare() 阶段自动分片到各 NPU
+    model = AutoModelForCausalLM.from_pretrained(
+        base_model,
+        torch_dtype=torch.bfloat16,
+        trust_remote_code=True,
+        attn_implementation="eager",
+        use_cache=False,
+        low_cpu_mem_usage=True,
+    )
 
     print(f"✅ Model loaded on rank {rank}")
 
