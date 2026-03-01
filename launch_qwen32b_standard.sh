@@ -71,7 +71,7 @@ LORA_DROPOUT=0.05
 DS_CONFIG="./ds_config_zero2.json"
 
 # 直接运行训练脚本
-"${PYTHON_BIN}" -m torchrun \
+/root/PERL-FORK/venv_perl/bin/torchrun \
     --nproc_per_node=8 \
     --master_port=29500 \
     finetune_npu_deepspeed_standard.py \
