@@ -12,7 +12,7 @@
 # ---------- Python 环境配置 ----------
 # 优先使用系统 Python（已安装 torch-npu），如需切换请修改此处
 # 可通过环境变量覆盖：PYTHON_BIN=/path/to/python bash launch_qwen32b_standard.sh
-PYTHON_BIN="${PYTHON_BIN:-python}"
+PYTHON_BIN="${PYTHON_BIN:-/root/PERL-FORK/venv_perl/bin/python}"
 
 # 验证 torch 可用性
 if ! "${PYTHON_BIN}" -c "import torch" 2>/dev/null; then
