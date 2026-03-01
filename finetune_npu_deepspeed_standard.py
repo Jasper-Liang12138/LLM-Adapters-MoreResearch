@@ -115,12 +115,13 @@ def train(
         attn_implementation="eager",
         use_cache=False,
         low_cpu_mem_usage=True,
+        local_files_only=True,
     )
 
     print(f"✅ Model loaded on rank {rank}")
 
     # Tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True, local_files_only=True)
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"
 
