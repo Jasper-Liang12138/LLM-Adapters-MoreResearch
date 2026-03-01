@@ -89,13 +89,15 @@ def train(
 
     print(f"💾 Loading model: {base_model}")
 
-    # 使用 DeepSpeed 时，模型初始化在 CPU 上，DeepSpeed 会处理分片
+    # 使用 DeepSpeed ZeRO-3 时，模型必须在 CPU 上初始化
+    # DeepSpeed 会自动将分片后的参数按需移动到 NPU
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
         torch_dtype=torch.bfloat16,
         trust_remote_code=True,
         attn_implementation="eager",
         use_cache=False,
+        device_map="cpu",
     )
 
     print(f"✅ Model loaded on rank {rank}")
