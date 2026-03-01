@@ -1,14 +1,44 @@
 #!/bin/bash
+# CTyunOS 22.06.2 训练脚本 - Qwen2.5-32B-Instruct + 8张华为昇腾910B
+# 系统：CTyunOS 22.06.2@ascend-910b 64位
+# 硬件：8*HuaweiAscend 910B
+# 使用 DeepSpeed ZeRO-2 优化
 
 # ============================================
 # 天翼云训推服务 - Qwen-32B 标准微调（无课程学习）
 # 适用于平台自动配置环境变量的场景
 # ============================================
 
-# 模型和数据路径
-BASE_MODEL="Qwen/Qwen-32B"
-DATA_PATH="/work/basicData/2021154936252485632"
-OUTPUT_DIR="/work/mount/Qwen32bLoraSft"
+# ---------- 路径配置（按需修改）----------
+MODEL_PATH="${MODEL_PATH:-/mnt/nvme0/models/Qwen2.5-32B-Instruct}"
+BASE_MODEL="$MODEL_PATH"
+DATA_PATH="/root/PERL-FORK/ft-dataset/kicad_sft_dataset_590.json"
+OUTPUT_DIR=/mnt/nvme0/output/grpo_lora_qwen25_32b_ctyunos_910b_$(date +%Y%m%d_%H%M%S)
+LOG_FILE=${OUTPUT_DIR}/output.log
+
+mkdir -p "${OUTPUT_DIR}"
+
+# 设置NPU环境变量（CTyunOS专用）
+export ASCEND_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+export HCCL_CONNECT_TIMEOUT=1800
+export HCCL_EXEC_TIMEOUT=1800
+export COMBINED_ENABLE=1       # 启用混合精度优化
+export TASK_QUEUE_ENABLE=1     # 启用任务队列优化
+
+# Qwen2.5-32B 显存优化：启用梯度检查点相关优化
+export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
+
+echo "[INFO] 使用模型路径: ${MODEL_PATH}"
+echo "[INFO] 数据集路径: ${DATA_PATH}"
+echo "[INFO] 输出目录: ${OUTPUT_DIR}"
+echo "[INFO] 日志文件: ${LOG_FILE}"
+echo "📊 Environment Info:"
+echo "   - MASTER_ADDR: ${MASTER_ADDR:-auto}"
+echo "   - MASTER_PORT: ${MASTER_PORT:-auto}"
+echo "   - WORLD_SIZE: ${WORLD_SIZE:-auto}"
+echo "   - RANK: ${RANK:-auto}"
+echo "   - LOCAL_RANK: ${LOCAL_RANK:-auto}"
+echo "[INFO] 开始训练..."
 
 # 训练超参数
 BATCH_SIZE=128
@@ -18,20 +48,12 @@ LEARNING_RATE=2e-5
 CUTOFF_LEN=2048
 
 # LoRA 参数
-LORA_R=64
-LORA_ALPHA=128
+LORA_R=32
+LORA_ALPHA=64
 LORA_DROPOUT=0.05
 
-# DeepSpeed 配置文件
-DS_CONFIG="./ds_config_zero3.json"
-
-echo "🚀 Starting standard fine-tuning on 天翼云..."
-echo "📊 Environment Info:"
-echo "   - MASTER_ADDR: ${MASTER_ADDR:-auto}"
-echo "   - MASTER_PORT: ${MASTER_PORT:-auto}"
-echo "   - WORLD_SIZE: ${WORLD_SIZE:-auto}"
-echo "   - RANK: ${RANK:-auto}"
-echo "   - LOCAL_RANK: ${LOCAL_RANK:-auto}"
+# DeepSpeed 配置文件（ZeRO-2 优化）
+DS_CONFIG="./ds_config_zero2.json"
 
 # 直接运行训练脚本（DeepSpeed 会读取环境变量）
 python -m torch.distributed.launch \
@@ -51,7 +73,8 @@ python -m torch.distributed.launch \
     --lora_dropout $LORA_DROPOUT \
     --target_modules '["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]' \
     --train_on_inputs False \
-    --deepspeed_config "$DS_CONFIG"
+    --deepspeed_config "$DS_CONFIG" \
+    2>&1 | tee "${LOG_FILE}"
 
 # ============================================
 # 使用说明:
