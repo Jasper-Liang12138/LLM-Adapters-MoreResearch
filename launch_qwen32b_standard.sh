@@ -34,6 +34,14 @@ LOG_FILE=${OUTPUT_DIR}/output.log
 mkdir -p "${OUTPUT_DIR}"
 
 # 设置NPU环境变量（CTyunOS专用）
+# source CANN 环境，确保 TBE/ACL 组件正确加载
+if [ -f /usr/local/Ascend/ascend-toolkit/set_env.sh ]; then
+    source /usr/local/Ascend/ascend-toolkit/set_env.sh
+    echo "[INFO] CANN 环境已加载"
+else
+    echo "[WARN] 未找到 set_env.sh，跳过 CANN 环境初始化"
+fi
+
 export ASCEND_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 export HCCL_CONNECT_TIMEOUT=1800
 export HCCL_EXEC_TIMEOUT=1800
