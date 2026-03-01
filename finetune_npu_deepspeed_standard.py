@@ -83,22 +83,30 @@ def train(
     # 清理缓存
     torch.npu.empty_cache()
 
+    # 提前初始化分布式进程组（deepspeed.zero.Init 需要）
+    if not torch.distributed.is_initialized():
+        torch.distributed.init_process_group(backend="hccl")
+
     # 多节点训练时，错开模型加载时间
     if world_size > 1 and rank > 0:
         time.sleep(rank * 2)
 
     print(f"💾 Loading model: {base_model}")
 
-    # 使用 DeepSpeed ZeRO-3 时，模型必须在 CPU 上初始化
-    # DeepSpeed 会自动将分片后的参数按需移动到 NPU
-    model = AutoModelForCausalLM.from_pretrained(
-        base_model,
-        torch_dtype=torch.bfloat16,
-        trust_remote_code=True,
-        attn_implementation="eager",
-        use_cache=False,
-        device_map="cpu",
-    )
+    # 使用 deepspeed.zero.Init 上下文在 ZeRO-3 模式下初始化模型
+    # 这样每个 rank 只持有模型参数的 1/world_size 分片，避免 OOM
+    import deepspeed
+    ds_init_config = {"zero_optimization": {"stage": 3}}
+    with deepspeed.zero.Init(config_dict_or_path=ds_init_config,
+                             mem_efficient_linear=False,
+                             remote_device=None):
+        model = AutoModelForCausalLM.from_pretrained(
+            base_model,
+            torch_dtype=torch.bfloat16,
+            trust_remote_code=True,
+            attn_implementation="eager",
+            use_cache=False,
+        )
 
     print(f"✅ Model loaded on rank {rank}")
 
