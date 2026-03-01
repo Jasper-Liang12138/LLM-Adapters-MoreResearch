@@ -120,12 +120,15 @@ def train(
 
     print(f"✅ Model loaded on rank {rank}")
 
-    # 将所有 registered buffer（如 rotary_emb 的 inv_freq）移到当前 NPU
-    # ZeRO-3 offload_optimizer 不会自动处理 buffer，需要手动移
-    current_device = torch.device(f"npu:{local_rank}")
-    for name, buf in model.named_buffers():
-        if buf is not None and buf.device.type == "cpu":
-            buf.data = buf.data.to(current_device)
+    # Patch RoPE forward：inv_freq 在 offload_param 时留在 CPU，
+    # 在 forward 时动态移到与 position_ids 相同的设备，避免设备不匹配
+    import transformers.models.qwen2.modeling_qwen2 as qwen2_modeling
+    _original_rope_forward = qwen2_modeling.Qwen2RotaryEmbedding.forward
+    def _patched_rope_forward(self, x, position_ids):
+        if self.inv_freq.device != x.device:
+            self.inv_freq = self.inv_freq.to(x.device)
+        return _original_rope_forward(self, x, position_ids)
+    qwen2_modeling.Qwen2RotaryEmbedding.forward = _patched_rope_forward
 
     # Tokenizer
     tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True, local_files_only=True)
