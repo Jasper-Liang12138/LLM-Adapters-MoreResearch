@@ -96,7 +96,10 @@ def train(
     # 使用 deepspeed.zero.Init 上下文在 ZeRO-3 模式下初始化模型
     # 这样每个 rank 只持有模型参数的 1/world_size 分片，避免 OOM
     import deepspeed
-    ds_init_config = {"zero_optimization": {"stage": 3}}
+    ds_init_config = {
+        "train_micro_batch_size_per_gpu": micro_batch_size,
+        "zero_optimization": {"stage": 3}
+    }
     with deepspeed.zero.Init(config_dict_or_path=ds_init_config,
                              mem_efficient_linear=False,
                              remote_device=None):
