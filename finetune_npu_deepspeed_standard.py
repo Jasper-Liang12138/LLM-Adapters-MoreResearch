@@ -280,7 +280,6 @@ def train(
         lr_scheduler_type="cosine",
         weight_decay=0.01,
         max_grad_norm=1.0,
-        gradient_checkpointing=True,
     )
 
     # Trainer
