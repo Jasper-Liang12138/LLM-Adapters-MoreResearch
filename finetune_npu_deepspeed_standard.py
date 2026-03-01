@@ -184,10 +184,6 @@ def train(
     model = get_peft_model(model, config)
     model.print_trainable_parameters()
 
-    # 开启梯度检查点以节省显存（用计算换显存）
-    model.enable_input_require_grads()
-    model.gradient_checkpointing_enable()
-
     # 加载数据集
     if rank == 0:
         print(f"📚 Loading dataset from {data_path}")
