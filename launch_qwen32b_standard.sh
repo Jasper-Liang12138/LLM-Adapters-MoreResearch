@@ -25,7 +25,7 @@ echo "[INFO] Python 路径: $(${PYTHON_BIN} -c 'import sys; print(sys.executable
 echo "[INFO] torch 版本: $(${PYTHON_BIN} -c 'import torch; print(torch.__version__)')"
 
 # ---------- 路径配置（按需修改）----------
-MODEL_PATH="${MODEL_PATH:-/mnt/nvme0/models/Qwen2.5-32B-Instruct}"
+MODEL_PATH="${MODEL_PATH:-/mnt/nvme0/models/Qwen2.5-7B-Instruct}"
 BASE_MODEL="$MODEL_PATH"
 DATA_PATH="/root/PERL-FORK/ft-dataset/kicad_sft_dataset_590.json"
 OUTPUT_DIR=/mnt/nvme0/output/grpo_lora_qwen25_32b_ctyunos_910b_$(date +%Y%m%d_%H%M%S)
