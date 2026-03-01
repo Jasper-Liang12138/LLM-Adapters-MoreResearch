@@ -99,51 +99,8 @@ def train(
     if not torch.distributed.is_initialized():
         torch.distributed.init_process_group(backend="hccl")
 
-    # 计算梯度累积步数（DeepSpeed zero.Init 需要提前知道）
+    # 计算梯度累积步数
     gradient_accumulation_steps = batch_size // (micro_batch_size * world_size)
-
-    # ---- 提前解析/生成 DeepSpeed 配置文件路径 ----
-    # deepspeed.zero.Init 必须在 from_pretrained 之前拿到配置 dict
-    if deepspeed_config is None:
-        ds_config_dict = {
-            "train_batch_size": batch_size,
-            "train_micro_batch_size_per_gpu": micro_batch_size,
-            "gradient_accumulation_steps": gradient_accumulation_steps,
-            "gradient_clipping": 1.0,
-            "zero_optimization": {
-                "stage": 3,
-                "offload_optimizer": {
-                    "device": "cpu",
-                    "pin_memory": True
-                },
-                "offload_param": {
-                    "device": "cpu",
-                    "pin_memory": True
-                },
-                "overlap_comm": False,
-                "contiguous_gradients": True,
-                "sub_group_size": 1e8,
-                "reduce_bucket_size": "auto",
-                "stage3_prefetch_bucket_size": "auto",
-                "stage3_param_persistence_threshold": "auto",
-                "stage3_max_live_parameters": 2e7,
-                "stage3_max_reuse_distance": 0,
-                "stage3_gather_16bit_weights_on_model_save": True
-            },
-            "bf16": {
-                "enabled": True
-            },
-            "steps_per_print": 10,
-            "wall_clock_breakdown": False
-        }
-        os.makedirs(output_dir, exist_ok=True)
-        ds_config_path = os.path.join(output_dir, "ds_config.json")
-        with open(ds_config_path, "w") as f:
-            json.dump(ds_config_dict, f, indent=2)
-        deepspeed_config = ds_config_path
-    else:
-        with open(deepspeed_config) as f:
-            ds_config_dict = json.load(f)
 
     if rank == 0:
         print(f"💾 DeepSpeed config: {deepspeed_config}")
@@ -163,37 +120,15 @@ def train(
         return _original_rope_forward(self, x, position_ids)
     qwen2_modeling.Qwen2RotaryEmbedding.forward = _patched_rope_forward
 
-    # 使用 deepspeed.zero.Init 上下文加载模型
-    # 这使参数直接以分片形式存在于 CPU，offload_param 才真正生效
-    # remote_device="cpu" 确保初始化时参数在 CPU 而非 meta/NPU
-    # deepspeed.zero.Init 不支持 "auto"，需要传入具体数值
-    import deepspeed
-    _zero_init_cfg = {
-        "train_batch_size": micro_batch_size * gradient_accumulation_steps,
-        "train_micro_batch_size_per_gpu": micro_batch_size,
-        "gradient_accumulation_steps": gradient_accumulation_steps,
-        "zero_optimization": {
-            "stage": 3,
-            "offload_param": {
-                "device": "cpu",
-                "pin_memory": True,
-            },
-        },
-    }
-    with deepspeed.zero.Init(
-        remote_device="cpu",
-        pin_memory=True,
-        config_dict_or_path=_zero_init_cfg,
-        dtype=torch.bfloat16,
-    ):
-        model = AutoModelForCausalLM.from_pretrained(
-            base_model,
-            torch_dtype=torch.bfloat16,
-            trust_remote_code=True,
-            attn_implementation="eager",
-            use_cache=False,
-            local_files_only=True,
-        )
+    model = AutoModelForCausalLM.from_pretrained(
+        base_model,
+        torch_dtype=torch.bfloat16,
+        trust_remote_code=True,
+        attn_implementation="eager",
+        use_cache=False,
+        low_cpu_mem_usage=True,
+        local_files_only=True,
+    )
 
     print(f"✅ Model loaded on rank {rank}")
 
