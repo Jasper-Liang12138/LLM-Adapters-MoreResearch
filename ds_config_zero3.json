@@ -22,14 +22,14 @@
       "max_in_cpu": 1e9
     },
 
-    "overlap_comm": true,
+    "overlap_comm": false,
     "contiguous_gradients": true,
     "sub_group_size": 1e8,
     "reduce_bucket_size": "auto",
     "stage3_prefetch_bucket_size": "auto",
     "stage3_param_persistence_threshold": "auto",
-    "stage3_max_live_parameters": 1e8,
-    "stage3_max_reuse_distance": 1e8,
+    "stage3_max_live_parameters": 2e7,
+    "stage3_max_reuse_distance": 0,
     "stage3_gather_16bit_weights_on_model_save": true
   },
 
