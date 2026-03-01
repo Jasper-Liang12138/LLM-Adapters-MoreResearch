@@ -169,7 +169,7 @@ def train(
     # deepspeed.zero.Init 不支持 "auto"，需要传入具体数值
     import deepspeed
     _zero_init_cfg = {
-        "train_batch_size": micro_batch_size * gradient_accumulation_steps * world_size,
+        "train_batch_size": micro_batch_size * gradient_accumulation_steps,
         "train_micro_batch_size_per_gpu": micro_batch_size,
         "gradient_accumulation_steps": gradient_accumulation_steps,
         "zero_optimization": {
