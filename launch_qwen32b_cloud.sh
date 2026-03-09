@@ -7,7 +7,7 @@
 
 # 模型和数据路径
 BASE_MODEL="/work/mount/publicModel/Qwen3-32B"  # 或本地路径
-DATA_PATH="LLM-Adapters-MoreResearch/dataset/math_10k.json"
+DATA_PATH="dataset/math_10k.json"
 OUTPUT_DIR="/work/mount/Output/Qwen32bLoraSft"
 
 # 训练超参数
