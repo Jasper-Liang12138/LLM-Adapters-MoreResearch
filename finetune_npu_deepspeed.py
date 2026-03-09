@@ -76,19 +76,28 @@ def train(
 
     print(f"💾 Loading model: {base_model}")
 
-    # 读取 ds_config 用于 zero.Init（ZeRO-3 必须在模型加载时就分片，否则单卡 OOM）
+    # 读取 ds_config
     _ds_config_path = deepspeed_config if deepspeed_config else "./ds_config_zero3.json"
     with open(_ds_config_path) as f:
         _ds_config_dict = json.load(f)
 
+    # HfDeepSpeedConfig 必须在 from_pretrained 之前注册：
+    #   - 告知 transformers 当前是 ZeRO-3 模式，使其避免使用 meta tensor
+    #   - 否则 zero.Init._post_init_method 调用 .to(NPU) 时会崩溃：
+    #     "NotImplementedError: Cannot copy out of meta tensor; no data!"
+    # _hf_ds_config 对象必须保持存活直到训练结束，不可删除
+    from transformers.integrations import HfDeepSpeedConfig
+    _hf_ds_config = HfDeepSpeedConfig(_ds_config_dict)
+
     # zero.Init 只提供 train_micro_batch_size_per_gpu，
-    # 让 DeepSpeed 用已初始化的 dist group 的真实 world_size 自行推算 train_batch_size
+    # 让 DeepSpeed 用已初始化的 dist group 的真实 world_size 自行推算 train_batch_size。
+    # 不能包含 train_batch_size，否则 zero.Init 用 world_size=? 校验时会 AssertionError。
     _zero_init_config = {
         "train_micro_batch_size_per_gpu": micro_batch_size,
         "zero_optimization": _ds_config_dict["zero_optimization"],
     }
 
-    # 用 deepspeed.zero.Init 包裹模型加载，参数在创建时即被 ZeRO-3 分片到各卡
+    # 用 zero.Init 包裹模型加载，参数在构造时即被 ZeRO-3 分片到各卡，避免单卡 OOM
     with deepspeed.zero.Init(config_dict_or_path=_zero_init_config):
         model = AutoModelForCausalLM.from_pretrained(
             base_model,
