@@ -80,9 +80,10 @@ def train(
     # 清理缓存
     torch.npu.empty_cache()
 
-    # 多节点训练时，错开模型加载时间
-    if world_size > 1 and rank > 0:
-        time.sleep(rank * 2)
+    # 先初始化分布式通信（deepspeed.zero.Init 需要所有 rank 同步，必须先初始化）
+    import torch.distributed as dist
+    if not dist.is_initialized():
+        dist.init_process_group(backend="hccl")
 
     print(f"💾 Loading model: {base_model}")
 
@@ -92,6 +93,7 @@ def train(
         _ds_config_dict = json.load(f)
 
     # 用 deepspeed.zero.Init 包裹模型加载，参数在创建时即被 ZeRO-3 分片到各卡
+    # 注意：所有 rank 必须同时进入此上下文，不能有 sleep 错开
     with deepspeed.zero.Init(config_dict_or_path=_ds_config_dict):
         model = AutoModelForCausalLM.from_pretrained(
             base_model,
