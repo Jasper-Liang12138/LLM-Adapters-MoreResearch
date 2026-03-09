@@ -6,9 +6,9 @@
 # ============================================
 
 # 模型和数据路径
-BASE_MODEL="Qwen/Qwen-32B"  # 或本地路径
-DATA_PATH="/work/basicData/2021154936252485632"
-OUTPUT_DIR="/work/mount/Qwen32bLoraSft"
+BASE_MODEL="/work/mount/publicModel/Qwen3-32B"  # 或本地路径
+DATA_PATH="dataset/math_10k.json"
+OUTPUT_DIR="/work/mount/Output/Qwen32bLoraSft"
 
 # 训练超参数
 BATCH_SIZE=128
@@ -21,10 +21,6 @@ CUTOFF_LEN=2048
 LORA_R=64
 LORA_ALPHA=128
 LORA_DROPOUT=0.05
-
-# Curriculum Learning 参数
-USE_CURRICULUM=True
-CURRICULUM_SEED=42
 
 # DeepSpeed 配置文件
 DS_CONFIG="./ds_config_zero3.json"
@@ -64,8 +60,6 @@ python -m torch.distributed.launch \
     --lora_dropout $LORA_DROPOUT \
     --target_modules '["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]' \
     --train_on_inputs False \
-    --use_curriculum $USE_CURRICULUM \
-    --curriculum_seed $CURRICULUM_SEED \
     --deepspeed_config "$DS_CONFIG"
 
 # ============================================
