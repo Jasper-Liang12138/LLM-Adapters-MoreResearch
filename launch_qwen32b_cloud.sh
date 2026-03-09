@@ -43,8 +43,12 @@ echo "   - RANK: ${RANK:-auto}"
 echo "   - LOCAL_RANK: ${LOCAL_RANK:-auto}"
 
 # 直接运行训练脚本（DeepSpeed 会读取环境变量）
-python -m torch.distributed.launch \
-    --use_env \
+torchrun \
+    --nnodes=${WORLD_SIZE:-1} \
+    --nproc_per_node=8 \
+    --master_addr=${MASTER_ADDR:-localhost} \
+    --master_port=${MASTER_PORT:-23456} \
+    --node_rank=${RANK:-0} \
     finetune_npu_deepspeed.py \
     --base_model "$BASE_MODEL" \
     --data_path "$DATA_PATH" \
