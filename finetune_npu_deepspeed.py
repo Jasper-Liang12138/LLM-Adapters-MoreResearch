@@ -92,15 +92,10 @@ def train(
     with open(_ds_config_path) as f:
         _ds_config_dict = json.load(f)
 
-    # zero.Init 不接受 "auto"，需要提供真实数值的精简 config
-    # "auto" 只有 HuggingFace Trainer 的 DeepSpeed 集成才能解析
-    _grad_accum = batch_size // (micro_batch_size * world_size)
+    # zero.Init 只需要 zero_optimization 配置，不能包含 batch 相关字段
+    # 原因：zero.Init 内部用 world_size=1 校验 batch 参数，会触发 AssertionError
     _zero_init_config = {
-        "train_batch_size": batch_size,
-        "train_micro_batch_size_per_gpu": micro_batch_size,
-        "gradient_accumulation_steps": _grad_accum,
         "zero_optimization": _ds_config_dict["zero_optimization"],
-        "bf16": _ds_config_dict.get("bf16", {"enabled": True}),
     }
 
     # 用 deepspeed.zero.Init 包裹模型加载，参数在创建时即被 ZeRO-3 分片到各卡
