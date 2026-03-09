@@ -1,27 +1,11 @@
 {
-  "train_batch_size": 128,
-  "train_micro_batch_size_per_gpu": 1,
-  "gradient_accumulation_steps": 8,
+  "train_batch_size": "auto",
+  "train_micro_batch_size_per_gpu": "auto",
+  "gradient_accumulation_steps": "auto",
   "gradient_clipping": 1.0,
 
   "zero_optimization": {
     "stage": 3,
-
-    "offload_optimizer": {
-      "device": "cpu",
-      "pin_memory": true,
-      "buffer_count": 4,
-      "fast_init": false
-    },
-
-    "offload_param": {
-      "device": "cpu",
-      "pin_memory": true,
-      "buffer_count": 5,
-      "buffer_size": 1e8,
-      "max_in_cpu": 1e9
-    },
-
     "overlap_comm": true,
     "contiguous_gradients": true,
     "sub_group_size": 1e9,

@@ -20,6 +20,7 @@ import time
 torch_npu.npu.set_compile_mode(jit_compile=False)
 torch.npu.set_option({"ACL_PRECISION_MODE": "must_keep_origin_dtype"})
 
+import deepspeed
 import transformers
 from datasets import load_dataset, concatenate_datasets
 from tqdm import tqdm
@@ -85,14 +86,20 @@ def train(
 
     print(f"💾 Loading model: {base_model}")
 
-    # 使用 DeepSpeed 时，模型初始化在 CPU 上，DeepSpeed 会处理分片
-    model = AutoModelForCausalLM.from_pretrained(
-        base_model,
-        torch_dtype=torch.bfloat16,
-        trust_remote_code=True,
-        attn_implementation="eager",  # flash_attention_2 在 NPU 上可能不稳定
-        use_cache=False,  # 训练时必须禁用
-    )
+    # 读取 ds_config 用于 zero.Init（ZeRO-3 必须在模型加载时就分片，否则单卡 OOM）
+    _ds_config_path = deepspeed_config if deepspeed_config else "./ds_config_zero3.json"
+    with open(_ds_config_path) as f:
+        _ds_config_dict = json.load(f)
+
+    # 用 deepspeed.zero.Init 包裹模型加载，参数在创建时即被 ZeRO-3 分片到各卡
+    with deepspeed.zero.Init(config_dict_or_path=_ds_config_dict):
+        model = AutoModelForCausalLM.from_pretrained(
+            base_model,
+            torch_dtype=torch.bfloat16,
+            trust_remote_code=True,
+            attn_implementation="eager",  # flash_attention_2 在 NPU 上可能不稳定
+            use_cache=False,  # 训练时必须禁用
+        )
 
     print(f"✅ Model loaded on rank {rank}")
 
@@ -328,20 +335,12 @@ def train(
     if deepspeed_config is None:
         # 如果没有提供配置文件，使用默认配置
         deepspeed_config = {
-            "train_batch_size": batch_size,
-            "train_micro_batch_size_per_gpu": micro_batch_size,
-            "gradient_accumulation_steps": gradient_accumulation_steps,
+            "train_batch_size": "auto",
+            "train_micro_batch_size_per_gpu": "auto",
+            "gradient_accumulation_steps": "auto",
             "gradient_clipping": 1.0,
             "zero_optimization": {
                 "stage": 3,
-                "offload_optimizer": {
-                    "device": "cpu",
-                    "pin_memory": True
-                },
-                "offload_param": {
-                    "device": "cpu",
-                    "pin_memory": True
-                },
                 "overlap_comm": True,
                 "contiguous_gradients": True,
                 "sub_group_size": 1e9,
