@@ -81,31 +81,28 @@ def train(
     with open(_ds_config_path) as f:
         _ds_config_dict = json.load(f)
 
-    # HfDeepSpeedConfig 必须在 from_pretrained 之前注册：
-    #   - 告知 transformers 当前是 ZeRO-3 模式，使其避免使用 meta tensor
-    #   - 否则 zero.Init._post_init_method 调用 .to(NPU) 时会崩溃：
-    #     "NotImplementedError: Cannot copy out of meta tensor; no data!"
-    # _hf_ds_config 对象必须保持存活直到训练结束，不可删除
+    # transformers 4.51.3 在检测到 HfDeepSpeedConfig 后，会在 from_pretrained 内部
+    # 自动调用 deepspeed.zero.Init(config_dict_or_path=deepspeed_config())。
+    # deepspeed_config() 返回传给 HfDeepSpeedConfig 的 dict，所以该 dict 必须含真实数值，
+    # 不能有 "auto"——否则 DeepSpeed 做 "auto" > 0 校验时 TypeError。
+    # 注意：_hf_ds_config 对象必须保持存活直到训练结束，不可删除。
+    import copy
     from transformers.integrations import HfDeepSpeedConfig
-    _hf_ds_config = HfDeepSpeedConfig(_ds_config_dict)
+    _grad_accum = batch_size // (micro_batch_size * world_size)
+    _hf_ds_config_dict = copy.deepcopy(_ds_config_dict)
+    _hf_ds_config_dict["train_batch_size"] = batch_size
+    _hf_ds_config_dict["train_micro_batch_size_per_gpu"] = micro_batch_size
+    _hf_ds_config_dict["gradient_accumulation_steps"] = _grad_accum
+    _hf_ds_config = HfDeepSpeedConfig(_hf_ds_config_dict)
 
-    # zero.Init 只提供 train_micro_batch_size_per_gpu，
-    # 让 DeepSpeed 用已初始化的 dist group 的真实 world_size 自行推算 train_batch_size。
-    # 不能包含 train_batch_size，否则 zero.Init 用 world_size=? 校验时会 AssertionError。
-    _zero_init_config = {
-        "train_micro_batch_size_per_gpu": micro_batch_size,
-        "zero_optimization": _ds_config_dict["zero_optimization"],
-    }
-
-    # 用 zero.Init 包裹模型加载，参数在构造时即被 ZeRO-3 分片到各卡，避免单卡 OOM
-    with deepspeed.zero.Init(config_dict_or_path=_zero_init_config):
-        model = AutoModelForCausalLM.from_pretrained(
-            base_model,
-            torch_dtype=torch.bfloat16,
-            trust_remote_code=True,
-            attn_implementation="eager",
-            use_cache=False,
-        )
+    # from_pretrained 内部会自动调用 zero.Init 完成 ZeRO-3 分片，无需手动包裹
+    model = AutoModelForCausalLM.from_pretrained(
+        base_model,
+        torch_dtype=torch.bfloat16,
+        trust_remote_code=True,
+        attn_implementation="eager",
+        use_cache=False,
+    )
 
     print(f"✅ Model loaded on rank {rank}")
 
