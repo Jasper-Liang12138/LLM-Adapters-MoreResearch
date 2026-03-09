@@ -7,7 +7,7 @@
 
 # 模型和数据路径
 BASE_MODEL="/work/mount/publicModel/Qwen3-32B"  # 或本地路径
-DATA_PATH="dataset/math_10k.json"
+DATA_PATH="LLM-Adapters-MoreResearch/dataset/math_10k.json"
 OUTPUT_DIR="/work/mount/Output/Qwen32bLoraSft"
 
 # 训练超参数
@@ -42,10 +42,14 @@ echo "   - WORLD_SIZE: ${WORLD_SIZE:-auto}"
 echo "   - RANK: ${RANK:-auto}"
 echo "   - LOCAL_RANK: ${LOCAL_RANK:-auto}"
 
+# 平台 WORLD_SIZE = 总进程数（节点数 × 每节点卡数），需换算为节点数
+NPROC_PER_NODE=8
+NNODES=$(( ${WORLD_SIZE:-8} / NPROC_PER_NODE ))
+
 # 直接运行训练脚本（DeepSpeed 会读取环境变量）
 torchrun \
-    --nnodes=${WORLD_SIZE:-1} \
-    --nproc_per_node=8 \
+    --nnodes=${NNODES} \
+    --nproc_per_node=${NPROC_PER_NODE} \
     --master_addr=${MASTER_ADDR:-localhost} \
     --master_port=${MASTER_PORT:-23456} \
     --node_rank=${RANK:-0} \
