@@ -1,0 +1,29 @@
+# ============================================================
+# 天翼云 Ascend NPU 训练环境依赖
+# 适用于 launch_qwen32b_cloud.sh / finetune_npu_deepspeed.py
+# ============================================================
+
+# 注意：torch 和 torch_npu 需通过 Ascend CANN 工具链单独安装，
+# 不在此文件中管理（平台镜像通常已预装）
+
+# --- 核心训练框架 ---
+transformers==4.51.3
+datasets
+accelerate
+deepspeed
+
+# --- 量化支持（可选，NPU 上通常不用，但保留兼容性）---
+bitsandbytes
+
+# --- Tokenizer 相关 ---
+sentencepiece
+tokenizers
+
+# --- 命令行参数解析（finetune_npu_deepspeed.py 入口使用）---
+fire
+
+# --- 进度条（训练/tokenize 进度显示）---
+tqdm
+
+# --- 数值计算（datasets/transformers 的传递依赖，显式固定）---
+numpy
